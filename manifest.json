@@ -1,0 +1,11 @@
+{
+  "display_name": "雨季播放器",
+  "name": "rainy-player",
+  "version": "0.1.0",
+  "description": "蓝白清新风格的 ST 功能播放器，包含小剧场、世界电台、摘要站和AI 画廊",
+  "author": "",
+  "homePage": "",
+  "js": "index.js",
+  "css": "style.css",
+  "requires": []
+}
