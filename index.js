@@ -1,29 +1,25 @@
 // ═══════════════════════════════════════════════════════════════
-// 🌧️ 雨季播放器 (Rainy Player) · SillyTavern Extension
-// 版本: 0.1.0
-// 描述: 蓝白清新风格的ST 功能播放器
+// 🌧️ 雨季播放器 (Rainy Player) v0.2.0
+// SillyTavern Extension · 拟物化 MP3 播放器
 // ═══════════════════════════════════════════════════════════════
 
 (function () {
     'use strict';
 
     // ═══════════════════════════════════════
-    // 📦 SECTION 1: 常量& 配置
+    // 📦SECTION 1: 常量& 配置
     // ═══════════════════════════════════════
 
     const PLUGIN_NAME = 'rainy-player';
-    const EXTENSION_PATH = `scripts/extensions/third_party/${PLUGIN_NAME}`;
 
-    // 频道定义
     const CHANNELS = [
-        { id: 'theater',icon: '🎬', label: '小剧场' },
+        { id: 'theater',  icon: '🎬', label: '剧场' },
         { id: 'radio',    icon: '📻', label: '电台' },
         { id: 'summary',  icon: '📋', label: '摘要' },
         { id: 'gallery',  icon: '🎨', label: '画廊' },
         { id: 'settings', icon: '⚙️', label: '设置' },
     ];
 
-    // 默认设置
     const DEFAULT_SETTINGS = {
         sub_api: {
             url: '',
@@ -40,7 +36,7 @@
             cfg_scale: 5,
             width: 832,
             height: 1216,
-            negative_prompt: 'lowres, bad anatomy, bad hands, text, error, missing fingers',
+            negative_prompt: 'lowres, bad anatomy, bad hands, text, error',
         },
         comfyui: {
             url: 'http://127.0.0.1:8188',
@@ -59,12 +55,18 @@
         },
         summary: {
             qr_name: '总结',
+            qr_command: '/trigger qr="总结"',
+            reminder_threshold: 50,
         },
+        custom_qr: [
+            // { id: 'uuid', name: '总结', command: '/trigger qr="总结"' },
+        ],
         fab_position: { x: null, y: null },
+        show_fab: true,
     };
 
     // ═══════════════════════════════════════
-    // 📦 SECTION 2: Storage存储封装
+    // 📦 SECTION 2: Storage
     // ═══════════════════════════════════════
 
     const PREFIX = 'rainy_';
@@ -74,161 +76,94 @@
             try {
                 const raw = localStorage.getItem(PREFIX + key);
                 return raw ? JSON.parse(raw) : defaultVal;
-            } catch {
-                return defaultVal;
-            }
+            } catch { return defaultVal; }
         },
-
         set(key, val) {
-            try {
-                localStorage.setItem(PREFIX + key, JSON.stringify(val));
-            } catch (e) {
-                console.error('[RainyPlayer] Storage set error:', e);
-            }
+            try { localStorage.setItem(PREFIX + key, JSON.stringify(val)); }
+            catch (e) { console.error('[RainyPlayer] Storage error:', e); }
         },
-
         update(key, defaultVal, updater) {
             const current = this.get(key, defaultVal);
             const updated = updater(current);
             this.set(key, updated);
             return updated;
         },
-
-        remove(key) {
-            localStorage.removeItem(PREFIX + key);
-        },
+        remove(key) { localStorage.removeItem(PREFIX + key); },
     };
 
-    // 设置的便捷读写
-    function getSettings() {
-        return storage.get('settings', { ...DEFAULT_SETTINGS });
-    }
-
-    function saveSettings(settings) {
-        storage.set('settings', settings);
-    }
-
-    function updateSettings(updater) {
-        const current = getSettings();
-        const merged = deepMerge(DEFAULT_SETTINGS, current);
-        const updated = updater(merged);
-        saveSettings(updated);
-        return updated;
-    }
-
-    // 深度合并工具
     function deepMerge(target, source) {
         const result = { ...target };
         for (const key of Object.keys(source)) {
             if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
                 result[key] = deepMerge(target[key] || {}, source[key]);
-            } else {
+            } else if (source[key] !== undefined) {
                 result[key] = source[key];
             }
         }
         return result;
     }
 
+    function getSettings() {
+        const saved = storage.get('settings', {});
+        return deepMerge(DEFAULT_SETTINGS, saved);
+    }
+
+    function saveSettings(settings) { storage.set('settings', settings); }
+
+    function updateSettings(updater) {
+        const s = getSettings();
+        const updated = updater(s);
+        saveSettings(updated);
+        return updated;
+    }
+
     // ═══════════════════════════════════════
-    // 📦 SECTION 3: 简易事件总线
+    // 📦 SECTION 3: 事件总线
     // ═══════════════════════════════════════
 
     const EventBus = {
-        _listeners: {},
-
-        on(event, callback) {
-            if (!this._listeners[event]) this._listeners[event] = [];
-            this._listeners[event].push(callback);
-        },
-
-        off(event, callback) {
-            if (!this._listeners[event]) return;
-            this._listeners[event] = this._listeners[event].filter(cb => cb !== callback);
-        },
-
-        emit(event, ...args) {
-            if (!this._listeners[event]) return;
-            for (const cb of this._listeners[event]) {
-                try { cb(...args); } catch (e) { console.error(`[RainyPlayer] EventBus error on "${event}":`, e); }
-            }
-        },
+        _l: {},
+        on(e, cb) { (this._l[e] ??= []).push(cb); },
+        off(e, cb) { if (this._l[e]) this._l[e] = this._l[e].filter(c => c !== cb); },
+        emit(e, ...a) { this._l[e]?.forEach(cb => { try { cb(...a); } catch (err) { console.error('[RainyPlayer]', err); } }); },
     };
 
-    // 内部事件名
-    const RainyEvents = {
+    const RE = { // Rainy Events
         SETTINGS_CHANGED: 'settings_changed',
-        API_STATUS_CHANGED: 'api_status_changed',
-        CHANNEL_CHANGED: 'channel_changed',
-    };
+        API_STATUS: 'api_status',
+        CHANNEL_CHANGED: 'channel_changed',};
 
     // ═══════════════════════════════════════
-    // 📦 SECTION 4: 副API 封装
+    // 📦 SECTION 4: 副API
     // ═══════════════════════════════════════
 
-    // 获取模型列表
     async function fetchModelList(url, key) {
-        if (!url) throw new Error('请先填写 API 地址');
-
-        // 确保 URL 格式正确
-        let baseUrl = url.replace(/\/+$/, '');
-        if (!baseUrl.includes('/v1')) {
-            baseUrl += '/v1';
-        }
-
-        const resp = await fetch(`${baseUrl}/models`, {
-            headers: {
-                'Authorization': `Bearer ${key}`,
-                'Content-Type': 'application/json',
-            },
+        if (!url) throw new Error('请先填写 API地址');
+        let base = url.replace(/\/+$/, '');
+        if (!base.endsWith('/v1')) base += '/v1';
+        const resp = await fetch(`${base}/models`, {
+            headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
         });
-
-        if (!resp.ok) {
-            throw new Error(`获取模型列表失败: ${resp.status} ${resp.statusText}`);
-        }
-
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
-        if (data.data && Array.isArray(data.data)) {
-            return data.data.map(m => m.id);
-        }
-        throw new Error('返回格式不正确，无法解析模型列表');
+        if (data.data && Array.isArray(data.data)) return data.data.map(m => m.id);
+        throw new Error('返回格式不正确');
     }
 
-    // 副 API 生成（通过 generateRaw）
-    // 注意：generateRaw 是 ST 提供的全局函数，需要在 ST 环境中才能调用
-    async function subApiGenerate({ ordered_prompts, max_chat_history = 20, stream = false, onStream = null }) {
-        const settings = getSettings();
-        const subApi = settings.sub_api;
+    async function subApiGenerate({ ordered_prompts, max_chat_history = 20 }) {
+        const s = getSettings().sub_api;
+        if (!s.url || !s.model) throw new Error('请先在设置中配置副 API');
+        if (typeof SillyTavern === 'undefined' || !SillyTavern.getContext) throw new Error('ST 环境不可用');
 
-        if (!subApi.url || !subApi.model) {
-            throw new Error('请先在设置中配置副 API');
-        }
-
-        // 检查 generateRaw 是否可用
-        if (typeof SillyTavern === 'undefined' || !SillyTavern.getContext) {
-            throw new Error('SillyTavern 环境不可用');
-        }
-
-        const context = SillyTavern.getContext();
-
-        const config = {
-            custom_api: {
-                apiurl: subApi.url,
-                key: subApi.key,
-                model: subApi.model,
-                max_tokens: subApi.max_tokens,
-                temperature: subApi.temperature,
-            },
-            ordered_prompts,
-            max_chat_history,
-            should_stream: stream,
-            should_silence: true,
-        };
-
-        // 更新状态
+        const ctx = SillyTavern.getContext();
         setApiStatus('generating');
-
         try {
-            const result = await context.generateRaw(config);
+            const result = await ctx.generateRaw({
+                custom_api: { apiurl: s.url, key: s.key, model: s.model, max_tokens: s.max_tokens, temperature: s.temperature },
+                ordered_prompts,
+                max_chat_history,should_stream: false,
+                should_silence: true,
+            });
             setApiStatus('connected');
             return result;
         } catch (e) {
@@ -237,161 +172,106 @@
         }
     }
 
-    // API 状态管理
-    let currentApiStatus = 'idle'; // idle | connected | generating | error
-
-    function setApiStatus(status) {
-        currentApiStatus = status;
-        EventBus.emit(RainyEvents.API_STATUS_CHANGED, status);
-        updateStatusBar(status);
+    let apiStatus = 'idle';
+    function setApiStatus(s) {
+        apiStatus = s;
+        EventBus.emit(RE.API_STATUS, s);
+        updateStatusBarUI(s);
+        updateLedUI(s);
     }
 
-    //═══════════════════════════════════════
-    // 📦 SECTION 5: Toast 提示
+    // ═══════════════════════════════════════
+    // 📦 SECTION 5: Toast
     // ═══════════════════════════════════════
 
-    let toastContainer = null;
-
-    function showToast(message, type = 'info', duration = 3000) {
-        if (!toastContainer) {
-            toastContainer = document.createElement('div');
-            toastContainer.className = 'rainy-toast-container';
-            document.body.appendChild(toastContainer);
+    let toastBox = null;
+    function showToast(msg, type = 'info', dur = 3000) {
+        if (!toastBox) {
+            toastBox = document.createElement('div');
+            toastBox.className = 'rainy-toast-container';
+            document.body.appendChild(toastBox);
         }
-
-        const toast = document.createElement('div');
-        toast.className = `rainy-toast is-${type}`;
-        toast.textContent = message;
-        toastContainer.appendChild(toast);
-
-        setTimeout(() => {
-            toast.classList.add('is-hiding');
-            setTimeout(() => toast.remove(), 300);
-        }, duration);
+        const t = document.createElement('div');
+        t.className = `rainy-toast is-${type}`;
+        t.textContent = msg;
+        toastBox.appendChild(t);
+        setTimeout(() => { t.classList.add('is-hiding'); setTimeout(() => t.remove(), 300); }, dur);
     }
 
     // ═══════════════════════════════════════
-    // 📦 SECTION 6: UI 构建 -悬浮球
+    // 📦 SECTION 6:悬浮球
     // ═══════════════════════════════════════
 
     function createFAB() {
         const fab = document.createElement('button');
         fab.className = 'rainy-fab';
+        fab.id = 'rainy-fab';
         fab.title = '雨季播放器';
         fab.innerHTML = `
-            <svg class="rainy-fab-icon" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
-                      fill="none" stroke="currentColor" stroke-width="1.5"/>
-                <path d="M8 12l2-6 2 8 2-4 22"
-                      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="6" r="1" fill="currentColor" opacity="0.6"/>
-                <circle cx="18" cy="8" r="0.8" fill="currentColor" opacity="0.4"/>
-                <circle cx="8" cy="18" r="0.6" fill="currentColor" opacity="0.5"/>
-            </svg>
+            <div class="rainy-fab-inner">
+                <svg viewBox="0 0 24 24"><path d="M12 3v10.55A44 0 1 0 14 17V7h4V3h-6z" fill="currentColor"/></svg>
+            </div>
         `;
         return fab;
     }
 
-    //悬浮球拖拽逻辑（同时支持 mouse 和 touch）
     function makeDraggable(fab) {
-        let isDragging = false;
-        let startX, startY, startLeft, startTop;
-        let hasMoved = false;
+        let dragging = false, startX, startY, startL, startT, moved;
 
         function onStart(e) {
-            // 获取坐标（兼容 touch 和 mouse）
-            const point = e.touches ? e.touches[0] : e;
-            startX = point.clientX;
-            startY = point.clientY;
-
-            const rect = fab.getBoundingClientRect();
-            startLeft = rect.left;
-            startTop = rect.top;
-
-            hasMoved = false;
-            isDragging = true;
-
-            fab.classList.add('is-dragging');
-
-            // 阻止触摸设备的页面滚动
-            if (e.touches) e.preventDefault();
+            const p = e.touches ? e.touches[0] : e;
+            startX = p.clientX; startY = p.clientY;
+            const r = fab.getBoundingClientRect();
+            startL = r.left; startT = r.top;
+            moved = false; dragging = true;
+            fab.classList.add('is-dragging');if (e.touches) e.preventDefault();
         }
 
         function onMove(e) {
-            if (!isDragging) return;
-
-            const point = e.touches ? e.touches[0] : e;
-            const dx = point.clientX - startX;
-            const dy = point.clientY - startY;
-
-            // 移动距离 >= 5px 才视为拖拽
-            if (Math.abs(dx) >= 5 || Math.abs(dy) >= 5) {
-                hasMoved = true;
-            }
-
-            if (hasMoved) {
-                let newLeft = startLeft + dx;
-                let newTop = startTop + dy;
-
-                // 边界限制
-                const fabSize = fab.offsetWidth;
-                const maxX = window.innerWidth - fabSize;
-                const maxY = window.innerHeight - fabSize;
-                newLeft = Math.max(0, Math.min(newLeft, maxX));
-                newTop = Math.max(0, Math.min(newTop, maxY));
-
-                // 用left/top 定位（覆盖 right/bottom）
-                fab.style.right = 'auto';
-                fab.style.bottom = 'auto';
-                fab.style.left = newLeft + 'px';
-                fab.style.top = newTop + 'px';
-
+            if (!dragging) return;
+            const p = e.touches ? e.touches[0] : e;
+            const dx = p.clientX - startX, dy = p.clientY - startY;
+            if (Math.abs(dx) >=5 || Math.abs(dy) >= 5) moved = true;
+            if (moved) {
+                const sz = fab.offsetWidth;
+                const nl = Math.max(0, Math.min(startL + dx, window.innerWidth - sz));
+                const nt = Math.max(0, Math.min(startT + dy, window.innerHeight - sz));
+                fab.style.right = 'auto'; fab.style.bottom = 'auto';
+                fab.style.left = nl + 'px'; fab.style.top = nt + 'px';
                 if (e.touches) e.preventDefault();
             }
         }
 
         function onEnd() {
-            if (!isDragging) return;
-            isDragging = false;
+            if (!dragging) return;
+            dragging = false;
             fab.classList.remove('is-dragging');
-
-            if (hasMoved) {
-                // 保存位置
-                const rect = fab.getBoundingClientRect();
-                updateSettings(s => {
-                    s.fab_position = { x: rect.left, y: rect.top };
-                    return s;
-                });
+            if (moved) {
+                const r = fab.getBoundingClientRect();
+                updateSettings(s => { s.fab_position = { x: r.left, y: r.top }; return s; });
             } else {
-                // 没有移动 → 视为点击 → 切换面板
                 togglePanel();
             }
         }
 
-        // Mouse 事件
         fab.addEventListener('mousedown', onStart);
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onEnd);
-
-        // Touch 事件
         fab.addEventListener('touchstart', onStart, { passive: false });
         document.addEventListener('touchmove', onMove, { passive: false });
         document.addEventListener('touchend', onEnd);
     }
 
-    // 恢复悬浮球位置
     function restoreFABPosition(fab) {
-        const settings = getSettings();
-        const pos = settings.fab_position;
-        if (pos && pos.x !== null && pos.y !== null) {
-            fab.style.right = 'auto';
-            fab.style.bottom = 'auto';
-            fab.style.left = pos.x + 'px';
-            fab.style.top = pos.y + 'px';
+        const pos = getSettings().fab_position;
+        if (pos?.x != null && pos?.y != null) {
+            fab.style.right = 'auto'; fab.style.bottom = 'auto';
+            fab.style.left = pos.x + 'px'; fab.style.top = pos.y + 'px';
         }
     }
 
-    //═══════════════════════════════════════
-    // 📦 SECTION 7: UI 构建 - 主面板
+    // ═══════════════════════════════════════
+    // 📦 SECTION 7: 主面板（MP3 外壳）
     // ═══════════════════════════════════════
 
     let panelEl = null;
@@ -403,74 +283,79 @@
         panel.className = 'rainy-panel';
         panel.id = 'rainy-panel';
 
+        // 生成扬声器孔
+        const speakerDots = Array(12).fill('<span class="rainy-mp3-speaker-dot"></span>').join('');
+
         panel.innerHTML = `
-            <!-- 标题栏 -->
-            <div class="rainy-header">
-                <div class="rainy-header-left">
-                    <div class="rainy-header-dot"></div>
-                    <span class="rainy-header-title">Rainy Player</span>
+            <!-- MP3 顶部：品牌 + LED + 扬声器 -->
+            <div class="rainy-mp3-top">
+                <div class="rainy-mp3-brand">
+                    <span class="rainy-mp3-led" id="rainy-led"></span>
+                    <span class="rainy-mp3-logo">Rainy Player</span>
                 </div>
-                <button class="rainy-close-btn" title="关闭">✕</button>
+                <div class="rainy-mp3-speaker">${speakerDots}</div>
+                <button class="rainy-mp3-close" id="rainy-close" title="关闭">✕</button>
             </div>
 
-            <!-- Tab 栏 -->
-            <div class="rainy-tabs">
-                ${CHANNELS.map(ch => `
-                    <button class="rainy-tab ${ch.id === currentChannel ? 'is-active' : ''}"
-                            data-channel="${ch.id}" title="${ch.label}">
-                <span class="rainy-tab-icon">${ch.icon}</span>
-                        <span class="rainy-tab-label">${ch.label}</span>
-                    </button>
-                `).join('')}
-            </div>
+            <!-- 屏幕（凹陷） -->
+            <div class="rainy-mp3-screen-wrap">
+                <div class="rainy-mp3-screen">
+                    <!--屏幕顶部信息 -->
+                    <div class="rainy-screen-header">
+                        <span class="rainy-screen-title" id="rainy-screen-title">🎬 剧场</span>
+                        <div class="rainy-screen-status">
+                            <span class="rainy-screen-status-dot" id="rainy-screen-dot"></span>
+                            <span id="rainy-screen-status-text">READY</span>
+                        </div>
+                    </div>
 
-            <!-- 内容区 -->
-            <div class="rainy-content" id="rainy-content">
-                ${CHANNELS.map(ch => `
-                    <div class="rainy-app-page ${ch.id === currentChannel ? 'is-active' : ''}" 
-                         data-page="${ch.id}" id="rainy-page-${ch.id}"></div>
-                `).join('')}
-            </div>
+                    <!-- 屏幕内容 -->
+                    <div class="rainy-screen-content" id="rainy-screen-content">
+                        ${CHANNELS.map(ch => `
+                            <div class="rainy-app-page ${ch.id === currentChannel ? 'is-active' : ''}"
+                                 data-page="${ch.id}" id="rainy-page-${ch.id}"></div>
+                        `).join('')}
+                    </div>
 
-            <!-- 底部状态栏 -->
-            <div class="rainy-statusbar">
-                <div class="rainy-status-text">
-                    <span class="rainy-status-dot" id="rainy-status-dot"></span>
-                    <span id="rainy-status-label">就绪</span>
+                    <!-- 屏幕底部状态 -->
+                    <div class="rainy-mp3-statusbar">
+                        <span class="rainy-mp3-statusbar-text" id="rainy-statusbar-left">v0.2.0</span>
+                        <span class="rainy-mp3-statusbar-model" id="rainy-statusbar-model"></span>
+                    </div>
                 </div>
-                <span class="rainy-status-text" id="rainy-status-model" style="font-size:10px;"></span>
+            </div>
+
+            <!-- 物理按钮区 -->
+            <div class="rainy-mp3-controls">
+                <div class="rainy-mp3-tabs">
+                    ${CHANNELS.map(ch => `
+                        <button class="rainy-mp3-tab ${ch.id === currentChannel ? 'is-active' : ''}"
+                                data-channel="${ch.id}" title="${ch.label}">
+                            <span class="rainy-mp3-tab-icon">${ch.icon}</span>
+                            <span class="rainy-mp3-tab-label">${ch.label}</span>
+                        </button>
+                    `).join('')}
+                </div>
             </div>
         `;
 
-        // 绑定事件
-        // 关闭按钮
-        panel.querySelector('.rainy-close-btn').addEventListener('click', () => closePanel());
-
-        // Tab 切换
-        panel.querySelectorAll('.rainy-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                const channelId = tab.dataset.channel;
-                switchChannel(channelId);
-            });
+        // 事件绑定
+        panel.querySelector('#rainy-close').addEventListener('click', closePanel);
+        panel.querySelectorAll('.rainy-mp3-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchChannel(tab.dataset.channel));
         });
 
         return panel;
     }
 
     function togglePanel() {
-        if (isPanelOpen) {
-            closePanel();
-        } else {
-            openPanel();
-        }
+        isPanelOpen ? closePanel() : openPanel();
     }
 
     function openPanel() {
         if (!panelEl) return;
         isPanelOpen = true;
         panelEl.classList.add('is-open');
-
-        // 首次打开时初始化当前频道
         initChannelIfNeeded(currentChannel);
     }
 
@@ -480,482 +365,469 @@
         panelEl.classList.remove('is-open');
     }
 
-    function switchChannel(channelId) {
-        if (channelId === currentChannel) return;
+    function switchChannel(id) {
+        if (id === currentChannel) return;
+        currentChannel = id;
 
-        currentChannel = channelId;
-
-        // 更新 Tab 高亮
-        panelEl.querySelectorAll('.rainy-tab').forEach(tab => {
-            tab.classList.toggle('is-active', tab.dataset.channel === channelId);
+        // 更新 Tab
+        panelEl.querySelectorAll('.rainy-mp3-tab').forEach(t => {
+            t.classList.toggle('is-active', t.dataset.channel === id);
         });
 
-        // 更新页面显示
-        panelEl.querySelectorAll('.rainy-app-page').forEach(page => {
-            page.classList.toggle('is-active', page.dataset.page === channelId);
+        // 更新页面
+        panelEl.querySelectorAll('.rainy-app-page').forEach(p => {
+            p.classList.toggle('is-active', p.dataset.page === id);
         });
 
-        // 初始化频道（如果还没初始化过）
-        initChannelIfNeeded(channelId);
+        // 更新屏幕标题
+        const ch = CHANNELS.find(c => c.id === id);
+        const titleEl = document.getElementById('rainy-screen-title');
+        if (titleEl && ch) titleEl.textContent = `${ch.icon} ${ch.label}`;
 
-        EventBus.emit(RainyEvents.CHANNEL_CHANGED, channelId);
+        initChannelIfNeeded(id);EventBus.emit(RE.CHANNEL_CHANGED, id);
     }
 
-    //═══════════════════════════════════════
+    // ═══════════════════════════════════════
     // 📦 SECTION 8: 频道初始化管理
     // ═══════════════════════════════════════
 
-    const initializedChannels = new Set();
+    const inited = new Set();
 
-    function initChannelIfNeeded(channelId) {
-        if (initializedChannels.has(channelId)) return;
-        initializedChannels.add(channelId);
+    function initChannelIfNeeded(id) {
+        if (inited.has(id)) return;
+        inited.add(id);
+        const el = document.getElementById(`rainy-page-${id}`);
+        if (!el) return;
+        const initFns = { theater: initTheater, radio: initRadio, summary: initSummary, gallery: initGallery, settings: initSettings };
+        initFns[id]?.(el);
+    }
 
-        const container = document.getElementById(`rainy-page-${channelId}`);
-        if (!container) return;
+    function reinitChannel(id) {
+        inited.delete(id);
+        const el = document.getElementById(`rainy-page-${id}`);
+        if (el) { el.innerHTML = ''; initChannelIfNeeded(id); }
+    }
 
-        switch (channelId) {
-            case 'theater':
-                initTheaterPage(container);
-                break;
-            case 'radio':
-                initRadioPage(container);
-                break;
-            case 'summary':
-                initSummaryPage(container);
-                break;
-            case 'gallery':
-                initGalleryPage(container);
-                break;
-            case 'settings':
-                initSettingsPage(container);
-                break;
+    // ═══════════════════════════════════════
+    // 📦 SECTION 9: LED & 状态栏 UI更新
+    // ═══════════════════════════════════════
+
+    function updateLedUI(status) {
+        const led = document.getElementById('rainy-led');
+        if (!led) return;
+        led.classList.remove('is-generating', 'is-error');
+        if (status === 'generating') led.classList.add('is-generating');
+        else if (status === 'error') led.classList.add('is-error');
+    }
+
+    function updateStatusBarUI(status) {
+        const dot = document.getElementById('rainy-screen-dot');
+        const text = document.getElementById('rainy-screen-status-text');
+        const model = document.getElementById('rainy-statusbar-model');
+        if (!dot || !text) return;
+
+        dot.classList.remove('is-on');
+        const map = { idle: 'READY', connected: 'ONLINE', generating: 'GENERATING...', error: 'ERROR' };
+        text.textContent = map[status] || 'READY';
+        if (status === 'connected' || status === 'generating') dot.classList.add('is-on');
+
+        if (model) {
+            const m = getSettings().sub_api?.model;
+            model.textContent = m ? m.split('/').pop() : '';
         }
     }
 
     // ═══════════════════════════════════════
-    // 📦 SECTION 9: 状态栏更新
+    // 📦 SECTION 10: 小剧场
     // ═══════════════════════════════════════
 
-    function updateStatusBar(status) {
-        const dot = document.getElementById('rainy-status-dot');
-        const label = document.getElementById('rainy-status-label');
-        const modelLabel = document.getElementById('rainy-status-model');
-
-        if (!dot || !label) return;
-
-        // 清除所有状态类
-        dot.classList.remove('is-connected', 'is-generating', 'is-error');
-
-        switch (status) {
-            case 'connected':
-                dot.classList.add('is-connected');
-                label.textContent = '已连接';
-                break;
-            case 'generating':
-                dot.classList.add('is-generating');
-                label.textContent = '生成中...';
-                break;
-            case 'error':
-                dot.classList.add('is-error');
-                label.textContent = '连接错误';
-                break;
-            default:
-                label.textContent = '就绪';
-        }
-
-        // 显示当前模型
-        if (modelLabel) {
-            const settings = getSettings();
-            const model = settings.sub_api?.model;
-            modelLabel.textContent = model ? model.split('/').pop() : '';
-        }
-    }
-
-    // ═══════════════════════════════════════
-    // 📦 SECTION 10: 小剧场页面（Phase 2完善）
-    // ═══════════════════════════════════════
-
-    function initTheaterPage(container) {
+    function initTheater(el) {
         const settings = getSettings();
         const types = settings.theater?.types || DEFAULT_SETTINGS.theater.types;
 
-        container.innerHTML = `
+        el.innerHTML = `
             <div class="rainy-theater-types" id="rainy-theater-types">
                 ${types.map((t, i) => `
-                    <button class="rainy-theater-type-btn ${i === 0 ? 'is-active' : ''}" 
+                    <button class="rainy-theater-type-btn ${i === 0 ? 'is-active' : ''}"
                             data-type-id="${t.id}">${t.name}</button>
                 `).join('')}
             </div>
-
             <div class="rainy-theater-output" id="rainy-theater-output">
-                <div class="rainy-empty">
-                    <div class="rainy-empty-icon">🎬</div>
-                    <div class="rainy-empty-text">选择类型，点击生成按钮<br>开始你的番外小剧场</div>
+                <div class="rainy-scr-empty">
+                    <div class="rainy-scr-empty-icon">🎬</div>
+                    <div class="rainy-scr-empty-text">选择类型，点击生成<br>开始番外小剧场</div>
                 </div>
             </div>
-
             <div class="rainy-theater-actions">
-                <button class="rainy-btn rainy-btn-primary" id="rainy-theater-generate">
-                    ▶ 生成
-                </button>
-                <button class="rainy-btn rainy-btn-secondary" id="rainy-theater-reroll" disabled>
-                    🔄 重Roll
-                </button>
-                <button class="rainy-btn rainy-btn-secondary rainy-btn-sm" id="rainy-theater-export" disabled>
-                    📤 导出
-                </button>
-            </div>
-
-            <div class="rainy-divider"></div>
-
-            <div style="font-size:12px; color:var(--rainy-text-muted); margin-bottom:8px;">📜 历史记录</div>
-            <div id="rainy-theater-history">
-                <div class="rainy-empty">
-                    <div class="rainy-empty-text" style="font-size:12px;">暂无历史记录</div>
-                </div>
-            </div>
+                <button class="rainy-scr-btn is-primary" id="rainy-theater-gen">▶ 生成</button>
+                <button class="rainy-scr-btn" id="rainy-theater-reroll" disabled>🔄 重Roll</button>
+                <button class="rainy-scr-btn rainy-scr-btn-sm" id="rainy-theater-export" disabled>📤 导出</button>
+            </div><div class="rainy-scr-divider"></div>
+            <div style="font-size:10px; color:var(--rainy-screen-text-dim); margin-bottom:6px;">📜 历史记录</div>
+            <div id="rainy-theater-history"></div>
         `;
 
-        // 类型选择
         let selectedTypeId = types[0]?.id;
-        container.querySelectorAll('.rainy-theater-type-btn').forEach(btn => {
+
+        el.querySelectorAll('.rainy-theater-type-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                container.querySelectorAll('.rainy-theater-type-btn').forEach(b => b.classList.remove('is-active'));
+                el.querySelectorAll('.rainy-theater-type-btn').forEach(b => b.classList.remove('is-active'));
                 btn.classList.add('is-active');
                 selectedTypeId = btn.dataset.typeId;
             });
         });
 
-        // 生成按钮（Phase 2 实现完整逻辑）
-        container.querySelector('#rainy-theater-generate').addEventListener('click', async () => {
+        el.querySelector('#rainy-theater-gen').addEventListener('click', async () => {
             const type = types.find(t => t.id === selectedTypeId);
             if (!type) return;
+            const out = el.querySelector('#rainy-theater-output');
+            const genBtn = el.querySelector('#rainy-theater-gen');
+            const rerollBtn = el.querySelector('#rainy-theater-reroll');
+            const exportBtn = el.querySelector('#rainy-theater-export');
 
-            const outputEl = container.querySelector('#rainy-theater-output');
-            const generateBtn = container.querySelector('#rainy-theater-generate');
-            const rerollBtn = container.querySelector('#rainy-theater-reroll');
-            const exportBtn = container.querySelector('#rainy-theater-export');
-
-            generateBtn.disabled = true;
-            outputEl.innerHTML = `
-                <div class="rainy-loading">
-                    <div class="rainy-loading-dot"></div>
-                    <div class="rainy-loading-dot"></div>
-                    <div class="rainy-loading-dot"></div>
-                </div>
-            `;
+            genBtn.disabled = true;
+            out.innerHTML = '<div class="rainy-scr-loading"><div class="rainy-scr-loading-dot"></div><div class="rainy-scr-loading-dot"></div><div class="rainy-scr-loading-dot"></div></div>';
 
             try {
                 const result = await subApiGenerate({
                     ordered_prompts: [
-                        'char_description',
-                        'char_personality',
-                        'chat_history',
+                        'char_description', 'char_personality', 'chat_history',
                         { role: 'system', content: type.prompt },
                         { role: 'user', content: '请生成小剧场。' },
                     ],
                     max_chat_history: 20,
                 });
-
-                outputEl.textContent = result;
+                out.textContent = result;
                 rerollBtn.disabled = false;
                 exportBtn.disabled = false;
 
-                // 存入历史
-                const historyItem = {
-                    id: crypto.randomUUID(),
-                    type_id: type.id,
-                    type_name: type.name,
-                    content: result,
-                    created_at: Date.now(),
-                    starred: false,
-                };
                 storage.update('theater_history', [], list => {
-                    list.unshift(historyItem);
-                    return list.slice(0, 50); // 最多保留50条
+                    list.unshift({ id: crypto.randomUUID(), type_id: type.id, type_name: type.name, content: result, created_at: Date.now(), starred: false });
+                    return list.slice(0, 50);
                 });
-
-                refreshTheaterHistory(container);
+                refreshTheaterHistory(el);
             } catch (e) {
-                outputEl.innerHTML = `<div class="rainy-empty"><div class="rainy-empty-text" style="color:#ef4444;">生成失败: ${e.message}</div></div>`;
-                showToast('小剧场生成失败: ' + e.message, 'error');
-            } finally {
-                generateBtn.disabled = false;
-            }
+                out.innerHTML = `<div class="rainy-scr-empty"><div class="rainy-scr-empty-text" style="color:#ef4444;">生成失败: ${e.message}</div></div>`;
+                showToast('生成失败: ' + e.message, 'error');
+            } finally { genBtn.disabled = false; }
         });
 
-        // 重Roll
-        container.querySelector('#rainy-theater-reroll').addEventListener('click', () => {
-            container.querySelector('#rainy-theater-generate').click();
-        });
+        el.querySelector('#rainy-theater-reroll').addEventListener('click', () => el.querySelector('#rainy-theater-gen').click());
 
-        // 导出
-        container.querySelector('#rainy-theater-export').addEventListener('click', () => {
-            const content = container.querySelector('#rainy-theater-output').textContent;
+        el.querySelector('#rainy-theater-export').addEventListener('click', () => {
+            const content = el.querySelector('#rainy-theater-output').textContent;
             if (!content) return;
             const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
+            a.href = URL.createObjectURL(blob);
             a.download = `小剧场_${new Date().toLocaleDateString()}.txt`;
             a.click();
-            URL.revokeObjectURL(url);
+            URL.revokeObjectURL(a.href);
             showToast('已导出', 'success');
         });
 
-        // 加载历史
-        refreshTheaterHistory(container);
+        refreshTheaterHistory(el);
     }
 
-    function refreshTheaterHistory(container) {
-        const historyEl = container.querySelector('#rainy-theater-history');
+    function refreshTheaterHistory(el) {
+        const box = el.querySelector('#rainy-theater-history');
         const history = storage.get('theater_history', []);
-
-        if (history.length === 0) {
-            historyEl.innerHTML = `<div class="rainy-empty"><div class="rainy-empty-text" style="font-size:12px;">暂无历史记录</div></div>`;
+        if (!history.length) {
+            box.innerHTML = '<div class="rainy-scr-empty"><div class="rainy-scr-empty-text" style="font-size:11px;">暂无记录</div></div>';
             return;
         }
-
-        historyEl.innerHTML = history.slice(0, 10).map(item => `
-            <div class="rainy-card" style="cursor:pointer;" data-history-id="${item.id}">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                    <span style="font-size:11px; color:var(--rainy-accent); font-weight:600;">${item.type_name}</span>
-                    <span style="font-size:10px; color:var(--rainy-text-muted);">${new Date(item.created_at).toLocaleString()}</span>
+        box.innerHTML = history.slice(0, 10).map(item => `
+            <div class="rainy-scr-card" style="cursor:pointer;" data-hid="${item.id}">
+                <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+                    <span style="font-size:10px; color:var(--rainy-screen-accent); font-weight:600;">${item.type_name}</span>
+                    <span style="font-size:9px; color:var(--rainy-screen-text-dim);">${new Date(item.created_at).toLocaleString()}</span>
                 </div>
-                <div style="font-size:12px; color:var(--rainy-text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                    ${item.content.substring(0, 60)}...
-                </div>
+                <div style="font-size:11px; color:var(--rainy-screen-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.content.substring(0, 50)}...</div>
             </div>
         `).join('');
 
-        // 点击历史记录 → 显示内容
-        historyEl.querySelectorAll('.rainy-card').forEach(card => {
+        box.querySelectorAll('.rainy-scr-card').forEach(card => {
             card.addEventListener('click', () => {
-                const id = card.dataset.historyId;
-                const item = history.find(h => h.id === id);
+                const item = history.find(h => h.id === card.dataset.hid);
                 if (item) {
-                    container.querySelector('#rainy-theater-output').textContent = item.content;
-                    container.querySelector('#rainy-theater-export').disabled = false;
+                    el.querySelector('#rainy-theater-output').textContent = item.content;
+                    el.querySelector('#rainy-theater-export').disabled = false;
                 }
             });
         });
     }
 
     // ═══════════════════════════════════════
-    // 📦 SECTION 11: 世界电台页面（Phase 3 完善）
+    // 📦 SECTION 11: 世界电台
     // ═══════════════════════════════════════
 
-    function initRadioPage(container) {
-        container.innerHTML = `
+    function initRadio(el) {
+        el.innerHTML = `
             <div class="rainy-radio-marquee-wrap">
                 <div class="rainy-radio-marquee" id="rainy-radio-marquee">
-                    📡 世界电台 · 正在调频点击下方按钮接收最新广播 📡
+                    ▸ WORLD RADIO ▸点击调频接收广播 ▸ STANDBY ▸▸▸
                 </div>
             </div>
-
             <div id="rainy-radio-news">
-                <div class="rainy-empty">
-                    <div class="rainy-empty-icon">📻</div>
-                    <div class="rainy-empty-text">点击"调频"按钮<br>接收来自这个世界的新闻播报</div>
+                <div class="rainy-scr-empty">
+                    <div class="rainy-scr-empty-icon">📻</div>
+                    <div class="rainy-scr-empty-text">点击「调频」按钮<br>接收来自这个世界的新闻</div>
                 </div>
             </div>
-
-            <div style="margin-top:16px; display:flex; gap:8px;">
-                <button class="rainy-btn rainy-btn-primary" id="rainy-radio-tune" style="flex:1;">
-                    📡 调频
-                </button></div>
-
-            <div class="rainy-divider"></div>
-
-            <div style="font-size:12px; color:var(--rainy-text-muted); margin-bottom:8px;">📜 广播历史</div>
-            <div id="rainy-radio-history">
-                <div class="rainy-empty">
-                    <div class="rainy-empty-text" style="font-size:12px;">暂无广播记录</div>
-                </div>
+            <div style="margin-top:12px;">
+                <button class="rainy-scr-btn is-primary" id="rainy-radio-tune" style="width:100%;">📡 调频</button>
             </div>
+            <div class="rainy-scr-divider"></div>
+            <div style="font-size:10px; color:var(--rainy-screen-text-dim); margin-bottom:6px;">📜 广播历史</div>
+            <div id="rainy-radio-history"></div>
         `;
 
-        // 调频按钮
-        container.querySelector('#rainy-radio-tune').addEventListener('click', async () => {
-            const newsEl = container.querySelector('#rainy-radio-news');
-            const tuneBtn = container.querySelector('#rainy-radio-tune');
-            const marquee = container.querySelector('#rainy-radio-marquee');
+        el.querySelector('#rainy-radio-tune').addEventListener('click', async () => {
+            const newsEl = el.querySelector('#rainy-radio-news');
+            const btn = el.querySelector('#rainy-radio-tune');
+            const marquee = el.querySelector('#rainy-radio-marquee');
 
-            tuneBtn.disabled = true;
-            marquee.textContent = '📡 正在接收信号...';
-            newsEl.innerHTML = `
-                <div class="rainy-loading">
-                    <div class="rainy-loading-dot"></div>
-                    <div class="rainy-loading-dot"></div>
-                    <div class="rainy-loading-dot"></div>
-                </div>
-            `;
+            btn.disabled = true;
+            marquee.textContent = '▸▸▸ RECEIVING SIGNAL ▸▸▸';
+            newsEl.innerHTML = '<div class="rainy-scr-loading"><div class="rainy-scr-loading-dot"></div><div class="rainy-scr-loading-dot"></div><div class="rainy-scr-loading-dot"></div></div>';
 
             try {
                 const result = await subApiGenerate({
                     ordered_prompts: [
-                        'world_info_before',
-                        'char_description',
-                        'world_info_after',
-                        { role: 'system', content: '你是这个世界中的广播电台主播。基于世界观设定，用生动的播报风格播报3条世界新闻。每条新闻用【标题】和正文的格式。新闻应该与世界观相关、有趣、有细节感。' },
+                        'world_info_before', 'char_description', 'world_info_after',
+                        { role: 'system', content: '你是这个世界中的广播电台主播。基于世界观设定，用生动的播报风格播报3条世界新闻。每条新闻用【标题】和正文的格式。' },
                         { role: 'user', content: '开始播报。' },
                     ],
                     max_chat_history: 10,
                 });
 
-                // 解析新闻（简单按【】分割）
-                const newsItems = parseRadioNews(result);
-                renderRadioNews(newsEl, newsItems, result);
+                const items = parseRadioNews(result);
+                newsEl.innerHTML = items.map(item => `
+                    <div class="rainy-radio-news-card">
+                        <div class="rainy-radio-news-title">${item.title}</div>
+                        <div class="rainy-radio-news-body">${item.body}</div>
+                    </div>
+                `).join('');
 
-                marquee.textContent = `📡 ${newsItems.length} 条新闻已接收 · ${new Date().toLocaleTimeString()}`;
+                marquee.textContent = `▸ ${items.length} NEWS RECEIVED ▸ ${new Date().toLocaleTimeString()} ▸▸▸`;
 
-                // 存入历史
                 storage.update('radio_history', [], list => {
-                    list.unshift({
-                        id: crypto.randomUUID(),
-                        content: result,
-                        created_at: Date.now(),
-                });
+                    list.unshift({ id: crypto.randomUUID(), content: result, created_at: Date.now() });
                     return list.slice(0, 20);
                 });
-
             } catch (e) {
-                newsEl.innerHTML = `<div class="rainy-empty"><div class="rainy-empty-text" style="color:#ef4444;">接收失败: ${e.message}</div></div>`;
-                marquee.textContent = '📡 信号中断...';
-                showToast('电台接收失败: ' + e.message, 'error');
-            } finally {
-                tuneBtn.disabled = false;
-            }
+                newsEl.innerHTML = `<div class="rainy-scr-empty"><div class="rainy-scr-empty-text" style="color:#ef4444;">接收失败: ${e.message}</div></div>`;
+                marquee.textContent = '▸▸▸ SIGNAL LOST ▸▸▸';
+                showToast('电台接收失败', 'error');
+            } finally { btn.disabled = false; }
         });
     }
 
     function parseRadioNews(text) {
-        //尝试按【标题】格式解析
         const regex = /【(.+?)】([\s\S]*?)(?=【|$)/g;
         const items = [];
-        let match;
-        while ((match = regex.exec(text)) !== null) {
-            items.push({
-                title: match[1].trim(),
-                body: match[2].trim(),
-            });
-        }
-        // 如果解析失败，整段作为一条
-        if (items.length === 0) {
-            items.push({ title: '广播速报', body: text });
-        }
+        let m;
+        while ((m = regex.exec(text)) !== null) items.push({ title: m[1].trim(), body: m[2].trim() });
+        if (!items.length) items.push({ title: '广播速报', body: text });
         return items;
     }
 
-    function renderRadioNews(container, items, rawText) {
-        container.innerHTML = items.map(item => `
-            <div class="rainy-radio-news-card">
-                <div class="rainy-radio-news-title">${item.title}</div>
-                <div class="rainy-radio-news-body">${item.body}</div>
-            </div>
-        `).join('');
-    }
-
     // ═══════════════════════════════════════
-    // 📦 SECTION 12: 摘要站页面（Phase 3 完善）
+    // 📦 SECTION 12: 摘要站（多条+ 翻页+ 提醒 + QR）
     // ═══════════════════════════════════════
 
-    function initSummaryPage(container) {
+    function initSummary(el) {
         const settings = getSettings();
+        const customQRs = settings.custom_qr || [];
 
-        container.innerHTML = `
-            <div style="font-size:13px; color:var(--rainy-text-secondary); margin-bottom:12px;">
-                从聊天记录中提取 <code style="background:var(--rainy-bg-card); padding:2px 6px; border-radius:4px; font-size:12px;">&lt;meow_FM&gt;</code> 标签内的摘要内容
+        el.innerHTML = `
+            <!-- 总结提醒 -->
+            <div class="rainy-summary-reminder" id="rainy-summary-reminder" style="display:none;">
+                <span class="rainy-summary-reminder-icon">⚠️</span>
+                <span id="rainy-summary-reminder-text">聊天已超过50楼，建议进行总结</span>
             </div>
 
+            <!-- 导航 -->
+            <div class="rainy-summary-nav">
+                <div class="rainy-summary-nav-btns">
+                    <button class="rainy-scr-btn rainy-scr-btn-sm" id="rainy-summary-prev" disabled>◀</button>
+                    <button class="rainy-scr-btn rainy-scr-btn-sm" id="rainy-summary-next" disabled>▶</button>
+                </div>
+                <div class="rainy-summary-nav-info" id="rainy-summary-nav-info">-- / --</div>
+            </div>
+
+            <!-- 摘要内容 -->
             <div class="rainy-summary-content" id="rainy-summary-content">
-                <div class="rainy-empty">
-                    <div class="rainy-empty-icon">📋</div>
-                    <div class="rainy-empty-text">点击"刷新"读取最新摘要</div>
+                <div class="rainy-scr-empty">
+                    <div class="rainy-scr-empty-icon">📋</div>
+                    <div class="rainy-scr-empty-text">点击「刷新」读取摘要</div>
                 </div>
             </div>
 
+            <!-- 操作按钮 -->
             <div class="rainy-summary-actions">
-                <button class="rainy-btn rainy-btn-primary" id="rainy-summary-refresh">
-                    🔄 刷新摘要
-                </button><button class="rainy-btn rainy-btn-secondary" id="rainy-summary-trigger-qr">
-                    📝 发送总结指令
-                </button>
+                <button class="rainy-scr-btn is-primary" id="rainy-summary-refresh">🔄 刷新摘要</button>
+                <button class="rainy-scr-btn" id="rainy-summary-trigger">📝 发送总结指令</button>
+            </div>
+
+            <div class="rainy-scr-divider"></div>
+
+            <!-- QR 快捷指令 -->
+            <div class="rainy-qr-section">
+                <div style="font-size:10px; color:var(--rainy-screen-text-dim); margin-bottom:6px;">⚡ 快捷指令</div>
+                <div class="rainy-qr-btns" id="rainy-qr-btns">
+                    ${customQRs.map(qr => `
+                        <button class="rainy-qr-btn" data-qr-cmd="${escapeHtml(qr.command)}" title="${escapeHtml(qr.command)}">${escapeHtml(qr.name)}</button>
+                    `).join('')}
+                    ${customQRs.length === 0 ? '<span style="font-size:10px; color:var(--rainy-screen-text-dim);">在设置中添加快捷指令</span>' : ''}
+                </div>
             </div>
         `;
 
-        // 刷新摘要
-        container.querySelector('#rainy-summary-refresh').addEventListener('click', async () => {
-            const contentEl = container.querySelector('#rainy-summary-content');
+        // 摘要数据
+        let allSummaries = [];
+        let currentIndex = 0;
 
+        function renderSummary() {
+            const contentEl = el.querySelector('#rainy-summary-content');
+            const navInfo = el.querySelector('#rainy-summary-nav-info');
+            const prevBtn = el.querySelector('#rainy-summary-prev');
+            const nextBtn = el.querySelector('#rainy-summary-next');
+
+            if (allSummaries.length === 0) {
+                contentEl.innerHTML = '<div class="rainy-scr-empty"><div class="rainy-scr-empty-text">未找到 &lt;meow_FM&gt; 标签内容</div></div>';
+                navInfo.textContent = '0 / 0';
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+                return;
+            }
+
+            const item = allSummaries[currentIndex];
+            contentEl.innerHTML = `
+                <div class="rainy-summary-meta">楼层 #${item.msgIndex + 1} · ${item.role === 'assistant' ? '🤖 AI' : '👤 User'} · ${new Date(item.timestamp || Date.now()).toLocaleString()}</div>
+                <div>${item.content}</div>
+            `;
+
+            navInfo.textContent = `${currentIndex + 1} / ${allSummaries.length}`;
+            prevBtn.disabled = currentIndex <= 0;
+            nextBtn.disabled = currentIndex >= allSummaries.length - 1;
+        }
+
+        //刷新
+        el.querySelector('#rainy-summary-refresh').addEventListener('click', () => {
             try {
-                if (typeof SillyTavern === 'undefined' || !SillyTavern.getContext) {
-                    throw new Error('SillyTavern 环境不可用');
-                }
-
-                const context = SillyTavern.getContext();
-                const chat = context.chat;
-
+                if (typeof SillyTavern === 'undefined' || !SillyTavern.getContext) throw new Error('ST 环境不可用');
+                const ctx = SillyTavern.getContext();
+                const chat = ctx.chat;
                 if (!chat || chat.length === 0) {
-                    contentEl.innerHTML = `<div class="rainy-empty"><div class="rainy-empty-text">当前没有聊天记录</div></div>`;
+                    allSummaries = [];
+                    renderSummary();
                     return;
                 }
 
-                // 从后往前找 <meow_FM> 标签
-                let found = null;
-                for (let i = chat.length - 1; i >= 0; i--) {
+                // 提取所有 <meow_FM> 标签
+                allSummaries = [];
+                for (let i = 0; i < chat.length; i++) {
                     const msg = chat[i];
                     const content = msg.mes || msg.message || '';
                     const match = content.match(/<meow_FM>([\s\S]*?)<\/meow_FM>/);
                     if (match) {
-                        found = match[1].trim();
-                        break;
+                        allSummaries.push({
+                            msgIndex: i,
+                            role: msg.is_user ? 'user' : 'assistant',
+                            content: match[1].trim(),
+                            timestamp: msg.send_date ? new Date(msg.send_date).getTime() : null,
+                        });
                     }
                 }
 
-                if (found) {
-                    contentEl.textContent = found;
-                    contentEl.style.whiteSpace = 'pre-wrap';
+                // 默认显示最新的（最后一条）
+                currentIndex = Math.max(0, allSummaries.length - 1);
+                renderSummary();// 检查楼层数提醒
+                const threshold = getSettings().summary?.reminder_threshold || 50;
+                const reminderEl = el.querySelector('#rainy-summary-reminder');
+                const reminderText = el.querySelector('#rainy-summary-reminder-text');
+
+                if (allSummaries.length > 0) {
+                    const lastSummaryFloor = allSummaries[allSummaries.length - 1].msgIndex;
+                    const messagesSinceLast = chat.length - 1 - lastSummaryFloor;
+                    if (messagesSinceLast >= threshold) {
+                        reminderEl.style.display = 'flex';
+                        reminderText.textContent = `距上次总结已过 ${messagesSinceLast} 楼（阈值 ${threshold}），建议总结`;
+                    } else {
+                        reminderEl.style.display = 'none';
+                    }
+                } else if (chat.length >= threshold) {
+                    reminderEl.style.display = 'flex';
+                    reminderText.textContent = `聊天已达 ${chat.length} 楼，尚无总结记录，建议总结`;
                 } else {
-                    contentEl.innerHTML = `<div class="rainy-empty"><div class="rainy-empty-text">未找到 &lt;meow_FM&gt; 标签内容<br>请先让 AI 生成包含此标签的摘要</div></div>`;
+                    reminderEl.style.display = 'none';
+                }
+
+                if (allSummaries.length > 0) {
+                    showToast(`找到 ${allSummaries.length} 条摘要`, 'success');
+                } else {
+                    showToast('未找到 meow_FM 标签', 'info');
                 }
             } catch (e) {
-                contentEl.innerHTML = `<div class="rainy-empty"><div class="rainy-empty-text" style="color:#ef4444;">读取失败: ${e.message}</div></div>`;
+                showToast('读取失败: ' + e.message, 'error');
             }
         });
 
-        // 触发 QR
-        container.querySelector('#rainy-summary-trigger-qr').addEventListener('click', async () => {
+        // 翻页
+        el.querySelector('#rainy-summary-prev').addEventListener('click', () => {
+            if (currentIndex > 0) { currentIndex--; renderSummary(); }
+        });
+        el.querySelector('#rainy-summary-next').addEventListener('click', () => {
+            if (currentIndex < allSummaries.length - 1) { currentIndex++; renderSummary(); }
+        });
+
+        // 发送总结指令
+        el.querySelector('#rainy-summary-trigger').addEventListener('click', async () => {
             try {
                 const settings = getSettings();
-                const qrName = settings.summary?.qr_name || '总结';
-
-                if (typeof SillyTavern === 'undefined' || !SillyTavern.getContext) {
-                    throw new Error('SillyTavern 环境不可用');
-                }
-
-                const context = SillyTavern.getContext();
-                await context.executeSlashCommands(`/trigger qr="${qrName}"`);
-                showToast(`已触发 QR: ${qrName}`, 'success');
+                const cmd = settings.summary?.qr_command || '/trigger qr="总结"';
+                if (typeof SillyTavern === 'undefined' || !SillyTavern.getContext) throw new Error('ST 环境不可用');
+                const ctx = SillyTavern.getContext();
+                await ctx.executeSlashCommands(cmd);
+                showToast('已发送总结指令', 'success');
             } catch (e) {
-                showToast('触发 QR 失败: ' + e.message, 'error');
+                showToast('指令失败: ' + e.message, 'error');
             }
+        });
+
+        // QR 快捷按钮
+        el.querySelectorAll('.rainy-qr-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                try {
+                    const cmd = btn.dataset.qrCmd;
+                    if (!cmd) return;
+                    if (typeof SillyTavern === 'undefined' || !SillyTavern.getContext) throw new Error('ST 环境不可用');
+                    const ctx = SillyTavern.getContext();
+                    await ctx.executeSlashCommands(cmd);
+                    showToast(`已执行: ${btn.textContent}`, 'success');
+                } catch (e) {
+                    showToast('执行失败: ' + e.message, 'error');
+                }
+            });
         });
     }
 
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
     // ═══════════════════════════════════════
-    // 📦 SECTION 13: 画廊页面（Phase 4 完善）
+    // 📦 SECTION 13: 画廊（占位）
     // ═══════════════════════════════════════
 
-    function initGalleryPage(container) {
-        container.innerHTML = `
-            <div class="rainy-empty">
-                <div class="rainy-empty-icon">🎨</div>
-                <div class="rainy-empty-text">
-                    画廊功能将在后续版本中实现<br>
-                    <span style="font-size:11px; color:var(--rainy-text-muted);">支持 NAI / ComfyUI 生图</span>
-                </div>
+    function initGallery(el) {
+        el.innerHTML = `
+            <div class="rainy-scr-empty">
+                <div class="rainy-scr-empty-icon">🎨</div>
+                <div class="rainy-scr-empty-text">画廊功能将在后续版本实现<br><span style="font-size:10px;">支持 NAI / ComfyUI 生图</span></div>
             </div>
         `;
     }
@@ -964,492 +836,503 @@
     // 📦 SECTION 14: 设置页面
     // ═══════════════════════════════════════
 
-    function initSettingsPage(container) {
-        const settings = getSettings();
+    function initSettings(el) {
+        const s = getSettings();
 
-        container.innerHTML = `
-            <!-- 副API 设置 -->
+        el.innerHTML = `
+            <!--── 副API ── -->
             <div class="rainy-settings-section">
-                <div class="rainy-settings-section-title">副 API 配置</div>
+                <div class="rainy-scr-section-title">副 API 配置</div>
 
-                <div class="rainy-field">
-                    <label class="rainy-field-label">API地址</label>
-                    <input class="rainy-input" type="text" id="rainy-set-api-url" 
-                           placeholder="https://api.example.com/v1"
-                           value="${settings.sub_api?.url || ''}">
-                    <div class="rainy-field-hint">OpenAI 兼容格式的 API 地址</div>
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">API 地址</label>
+                    <input class="rainy-scr-input" type="text" id="rs-api-url" placeholder="https://api.example.com/v1" value="${s.sub_api?.url || ''}">
                 </div>
 
-                <div class="rainy-field">
-                    <label class="rainy-field-label">API Key</label>
-                    <input class="rainy-input" type="password" id="rainy-set-api-key" 
-                           placeholder="sk-..." 
-                           value="${settings.sub_api?.key || ''}"></div>
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">API Key</label>
+                    <input class="rainy-scr-input" type="password" id="rs-api-key" placeholder="sk-..." value="${s.sub_api?.key || ''}">
+                </div>
 
-                <div class="rainy-field">
-                    <label class="rainy-field-label">模型</label>
-                    <div class="rainy-input-row">
-                        <div class="rainy-field">
-                            <select class="rainy-select" id="rainy-set-api-model">
-                                ${settings.sub_api?.model
-                                    ? `<option value="${settings.sub_api.model}" selected>${settings.sub_api.model}</option>`
-                                    : '<option value="">请先获取模型列表</option>'
-                                }
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">模型</label>
+                    <div class="rainy-scr-row">
+                        <div class="rainy-scr-field" style="margin-bottom:0;">
+                            <select class="rainy-scr-select" id="rs-api-model">
+                                ${s.sub_api?.model ? `<option value="${s.sub_api.model}" selected>${s.sub_api.model}</option>` : '<option value="">请先获取模型列表</option>'}
                             </select>
                         </div>
-                        <button class="rainy-btn rainy-btn-secondary rainy-btn-sm" id="rainy-set-fetch-models">
-                            获取列表
-                        </button>
-                    </div>
-                    <div class="rainy-field-hint" id="rainy-set-model-hint"></div>
+                        <button class="rainy-scr-btn rainy-scr-btn-sm" id="rs-fetch-models">获取</button>
+                    </div><div class="rainy-scr-hint" id="rs-model-hint"></div>
                 </div>
 
-                <div class="rainy-field">
-                    <label class="rainy-field-label">最大 Tokens</label>
-                    <div class="rainy-slider-row">
-                        <input type="range" id="rainy-set-max-tokens" 
-                               min="256" max="8192" step="256" 
-                               value="${settings.sub_api?.max_tokens || 2000}">
-                        <span class="rainy-slider-value" id="rainy-set-max-tokens-val">
-                            ${settings.sub_api?.max_tokens || 2000}
-                        </span>
-                    </div>
-                </div>
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">Max Tokens</label>
+                    <div class="rainy-scr-slider-row">
+                        <input type="range" id="rs-max-tokens" min="256" max="8192" step="256" value="${s.sub_api?.max_tokens || 2000}">
+                        <span class="rainy-scr-slider-val" id="rs-max-tokens-v">${s.sub_api?.max_tokens || 2000}</span>
+                    </div></div>
 
-                <div class="rainy-field">
-                    <label class="rainy-field-label">Temperature</label>
-                    <div class="rainy-slider-row">
-                        <input type="range" id="rainy-set-temperature" 
-                               min="0" max="2" step="0.1" 
-                               value="${settings.sub_api?.temperature || 0.9}">
-                        <span class="rainy-slider-value" id="rainy-set-temperature-val">
-                            ${settings.sub_api?.temperature || 0.9}
-                        </span>
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">Temperature</label>
+                    <div class="rainy-scr-slider-row">
+                        <input type="range" id="rs-temp" min="0" max="2" step="0.1" value="${s.sub_api?.temperature || 0.9}">
+                        <span class="rainy-scr-slider-val" id="rs-temp-v">${s.sub_api?.temperature || 0.9}</span>
                     </div>
                 </div>
             </div>
 
-            <!-- NAI 设置 -->
+            <!-- ── NAI ── -->
             <div class="rainy-settings-section">
-                <div class="rainy-settings-section-title">NAI 绘图配置</div>
+                <div class="rainy-scr-section-title">NAI 绘图配置</div>
 
-                <div class="rainy-field">
-                    <label class="rainy-field-label">NAI API Key</label>
-                    <input class="rainy-input" type="password" id="rainy-set-nai-key" 
-                           placeholder="pst-..." 
-                           value="${settings.nai?.key || ''}"></div>
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">NAI API Key</label>
+                    <input class="rainy-scr-input" type="password" id="rs-nai-key" placeholder="pst-..." value="${s.nai?.key || ''}">
+                </div>
 
-                <div class="rainy-field">
-                    <label class="rainy-field-label">模型</label>
-                    <select class="rainy-select" id="rainy-set-nai-model">
-                        <option value="nai-diffusion-4-5" ${settings.nai?.model === 'nai-diffusion-4-5' ? 'selected' : ''}>NAI Diffusion V4.5</option>
-                        <option value="nai-diffusion-4" ${settings.nai?.model === 'nai-diffusion-4' ? 'selected' : ''}>NAI Diffusion V4</option>
-                        <option value="nai-diffusion-3" ${settings.nai?.model === 'nai-diffusion-3' ? 'selected' : ''}>NAI Diffusion V3</option>
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">模型</label>
+                    <select class="rainy-scr-select" id="rs-nai-model">
+                        <option value="nai-diffusion-4-5" ${s.nai?.model === 'nai-diffusion-4-5' ? 'selected' : ''}>V4.5</option>
+                        <option value="nai-diffusion-4" ${s.nai?.model === 'nai-diffusion-4' ? 'selected' : ''}>V4</option>
+                        <option value="nai-diffusion-3" ${s.nai?.model === 'nai-diffusion-3' ? 'selected' : ''}>V3</option>
                     </select>
                 </div>
 
-                <div class="rainy-input-row" style="margin-bottom:12px;">
-                    <div class="rainy-field">
-                        <label class="rainy-field-label">宽度</label>
-                        <input class="rainy-input" type="number" id="rainy-set-nai-width" 
-                               value="${settings.nai?.width || 832}" step="64">
+                <div class="rainy-scr-row">
+                    <div class="rainy-scr-field">
+                        <label class="rainy-scr-label">宽度</label>
+                        <input class="rainy-scr-input" type="number" id="rs-nai-w" value="${s.nai?.width || 832}" step="64">
                     </div>
-                    <div class="rainy-field">
-                        <label class="rainy-field-label">高度</label>
-                        <input class="rainy-input" type="number" id="rainy-set-nai-height" 
-                               value="${settings.nai?.height || 1216}" step="64">
+                    <div class="rainy-scr-field">
+                        <label class="rainy-scr-label">高度</label>
+                        <input class="rainy-scr-input" type="number" id="rs-nai-h" value="${s.nai?.height || 1216}" step="64">
                     </div>
                 </div>
 
-                <div class="rainy-input-row" style="margin-bottom:12px;">
-                    <div class="rainy-field">
-                        <label class="rainy-field-label">Steps</label>
-                        <input class="rainy-input" type="number" id="rainy-set-nai-steps" 
-                               value="${settings.nai?.steps || 28}" min="1" max="50">
+                <div class="rainy-scr-row">
+                    <div class="rainy-scr-field">
+                        <label class="rainy-scr-label">Steps</label>
+                        <input class="rainy-scr-input" type="number" id="rs-nai-steps" value="${s.nai?.steps || 28}" min="1" max="50">
                     </div>
-                    <div class="rainy-field">
-                        <label class="rainy-field-label">CFG Scale</label>
-                        <input class="rainy-input" type="number" id="rainy-set-nai-cfg" 
-                               value="${settings.nai?.cfg_scale || 5}" min="1" max="30" step="0.5">
+                    <div class="rainy-scr-field">
+                        <label class="rainy-scr-label">CFG</label>
+                        <input class="rainy-scr-input" type="number" id="rs-nai-cfg" value="${s.nai?.cfg_scale || 5}" min="1" max="30" step="0.5">
                     </div>
                 </div>
 
-                <div class="rainy-field">
-                    <label class="rainy-field-label">负面提示词</label>
-                    <textarea class="rainy-textarea" id="rainy-set-nai-negative" rows="2">${settings.nai?.negative_prompt || ''}</textarea>
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">负面提示词</label>
+                    <textarea class="rainy-scr-textarea" id="rs-nai-neg" rows="2">${s.nai?.negative_prompt || ''}</textarea>
                 </div>
             </div>
 
-            <!-- ComfyUI 设置 -->
+            <!-- ── ComfyUI ── -->
             <div class="rainy-settings-section">
-                <div class="rainy-settings-section-title">ComfyUI 配置</div>
+                <div class="rainy-scr-section-title">ComfyUI 配置</div>
 
-                <div class="rainy-field">
-                    <label class="rainy-field-label">ComfyUI 地址</label>
-                    <input class="rainy-input" type="text" id="rainy-set-comfy-url" 
-                           placeholder="http://127.0.0.1:8188" 
-                           value="${settings.comfyui?.url || 'http://127.0.0.1:8188'}"></div>
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">ComfyUI 地址</label>
+                    <input class="rainy-scr-input" type="text" id="rs-comfy-url" placeholder="http://127.0.0.1:8188" value="${s.comfyui?.url || 'http://127.0.0.1:8188'}">
+                </div>
 
-                <div class="rainy-input-row" style="margin-bottom:12px;">
-                    <div class="rainy-field">
-                        <label class="rainy-field-label">正向提示词节点 ID</label>
-                        <input class="rainy-input" type="text" id="rainy-set-comfy-pos-node" 
-                               value="${settings.comfyui?.positive_node_id || '6'}">
+                <div class="rainy-scr-row">
+                    <div class="rainy-scr-field">
+                        <label class="rainy-scr-label">正向节点 ID</label>
+                        <input class="rainy-scr-input" type="text" id="rs-comfy-pos" value="${s.comfyui?.positive_node_id || '6'}">
                     </div>
-                    <div class="rainy-field">
-                        <label class="rainy-field-label">负向提示词节点 ID</label>
-                        <input class="rainy-input" type="text" id="rainy-set-comfy-neg-node" 
-                               value="${settings.comfyui?.negative_node_id || '7'}">
+                    <div class="rainy-scr-field">
+                        <label class="rainy-scr-label">负向节点 ID</label>
+                        <input class="rainy-scr-input" type="text" id="rs-comfy-neg" value="${s.comfyui?.negative_node_id || '7'}">
                     </div>
                 </div>
 
-                <div class="rainy-field">
-                    <label class="rainy-field-label">Workflow JSON</label>
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <button class="rainy-btn rainy-btn-secondary rainy-btn-sm" id="rainy-set-comfy-upload">
-                            📂 上传 Workflow
-                        </button>
-                        <span class="rainy-field-hint" id="rainy-set-comfy-workflow-status">
-                            ${settings.comfyui?.workflow ? '✅ 已加载' : '未加载'}
-                        </span>
-                    </div><input type="file" id="rainy-set-comfy-file" accept=".json" style="display:none;">
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">Workflow</label>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <button class="rainy-scr-btn rainy-scr-btn-sm" id="rs-comfy-upload">📂 上传</button>
+                        <span class="rainy-scr-hint" id="rs-comfy-status">${s.comfyui?.workflow ? '✅ 已加载' : '未加载'}</span>
+                    </div>
+                    <input type="file" id="rs-comfy-file" accept=".json" style="display:none;">
                 </div>
             </div>
 
-            <!-- 画廊前缀 -->
+            <!-- ── 画廊前缀 ── -->
             <div class="rainy-settings-section">
-                <div class="rainy-settings-section-title">画廊设置</div>
-
-                <div class="rainy-field">
-                    <label class="rainy-field-label">画师串前缀</label>
-                    <textarea class="rainy-textarea" id="rainy-set-gallery-prefix" rows="2"
-                              placeholder="masterpiece, best quality">${settings.gallery?.prefix || ''}</textarea>
-                    <div class="rainy-field-hint">生成图片时自动添加到提示词前面</div>
+                <div class="rainy-scr-section-title">画廊设置</div>
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">画师串前缀</label>
+                    <textarea class="rainy-scr-textarea" id="rs-gallery-prefix" rows="2" placeholder="masterpiece, best quality">${s.gallery?.prefix || ''}</textarea>
                 </div>
             </div>
 
-            <!-- 小剧场设置 -->
+            <!-- ── 小剧场类型 ── -->
             <div class="rainy-settings-section">
-                <div class="rainy-settings-section-title">小剧场设置</div>
-
-                <div id="rainy-set-theater-types">
-                    ${(settings.theater?.types || DEFAULT_SETTINGS.theater.types).map((t, i) => `
-                        <div class="rainy-card" data-type-index="${i}">
-                            <div class="rainy-input-row" style="margin-bottom:8px;">
-                                <div class="rainy-field">
-                                    <label class="rainy-field-label">类型名称</label>
-                                    <input class="rainy-input rainy-theater-type-name" type="text" value="${t.name}">
-                                </div>
-                                <button class="rainy-btn rainy-btn-secondary rainy-btn-sm rainy-theater-type-delete" 
-                                        style="color:#ef4444; align-self:flex-end;">✕</button>
-                            </div>
-                            <div class="rainy-field" style="margin-bottom:0;">
-                                <label class="rainy-field-label">提示词</label>
-                                <textarea class="rainy-textarea rainy-theater-type-prompt" rows="2">${t.prompt}</textarea>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div><button class="rainy-btn rainy-btn-secondary rainy-btn-sm" id="rainy-set-theater-add-type" style="margin-top:8px;">
-                    ＋ 添加类型
-                </button>
+                <div class="rainy-scr-section-title">小剧场类型</div>
+                <div id="rs-theater-types">
+                    ${(s.theater?.types || DEFAULT_SETTINGS.theater.types).map((t, i) => theaterTypeCardHTML(t, i)).join('')}
+                </div>
+                <button class="rainy-scr-btn rainy-scr-btn-sm" id="rs-theater-add" style="margin-top:6px;">＋ 添加类型</button>
             </div>
 
-            <!-- 摘要设置 -->
+            <!-- ── 摘要 & 总结指令 ── -->
             <div class="rainy-settings-section">
-                <div class="rainy-settings-section-title">摘要站设置</div>
+                <div class="rainy-scr-section-title">摘要站设置</div>
 
-                <div class="rainy-field">
-                    <label class="rainy-field-label">QR 名称</label>
-                    <input class="rainy-input" type="text" id="rainy-set-qr-name" 
-                           placeholder="总结" 
-                           value="${settings.summary?.qr_name || '总结'}">
-                    <div class="rainy-field-hint">点击"发送总结指令"时触发的 Quick Reply名称</div>
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">总结指令</label>
+                    <input class="rainy-scr-input" type="text" id="rs-summary-cmd" placeholder='/trigger qr="总结"' value="${escapeHtml(s.summary?.qr_command || '/trigger qr="总结"')}"><div class="rainy-scr-hint">点击「发送总结指令」时执行的Slash Command</div>
+                </div>
+
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">提醒阈值（楼层数）</label>
+                    <div class="rainy-scr-slider-row">
+                        <input type="range" id="rs-summary-threshold" min="20" max="200" step="10" value="${s.summary?.reminder_threshold || 50}">
+                        <span class="rainy-scr-slider-val" id="rs-summary-threshold-v">${s.summary?.reminder_threshold || 50}</span>
+                    </div>
+                <div class="rainy-scr-hint">距上次总结超过此楼层数时显示提醒</div>
                 </div>
             </div>
 
-            <!-- 保存按钮 -->
+            <!-- ── 自定义 QR 快捷指令 ── -->
+            <div class="rainy-settings-section">
+                <div class="rainy-scr-section-title">自定义快捷指令</div>
+                <div class="rainy-scr-hint" style="margin-bottom:8px;">添加常用的 Slash Command，将显示在摘要站底部</div>
+                <div id="rs-custom-qr">
+                    ${(s.custom_qr || []).map((qr, i) => customQRCardHTML(qr, i)).join('')}
+                </div>
+                <button class="rainy-scr-btn rainy-scr-btn-sm" id="rs-qr-add" style="margin-top:6px;">＋ 添加指令</button>
+            </div>
+
+            <!-- ── 显示设置 ── -->
+            <div class="rainy-settings-section">
+                <div class="rainy-scr-section-title">显示设置</div>
+                <div class="rainy-scr-field">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="rs-show-fab" ${s.show_fab !== false ? 'checked' : ''}>
+                        <span class="rainy-scr-label" style="margin:0;">显示悬浮球</span>
+                    </label>
+                    <div class="rainy-scr-hint">关闭后可通过扩展面板打开播放器</div>
+                </div>
+            </div>
+
+            <!-- 保存 -->
             <div style="padding:8px 0 20px;">
-                <button class="rainy-btn rainy-btn-primary" id="rainy-set-save" style="width:100%;">
-                    💾 保存所有设置
-                </button>
+                <button class="rainy-scr-btn is-primary" id="rs-save" style="width:100%; padding:10px;">💾 保存所有设置</button>
             </div>
         `;
 
-        // ──绑定设置页面事件 ──
+        // ── 事件绑定 ──
 
-        // 滑块实时显示数值
-        const maxTokensSlider = container.querySelector('#rainy-set-max-tokens');
-        const maxTokensVal = container.querySelector('#rainy-set-max-tokens-val');
-        maxTokensSlider.addEventListener('input', () => {
-            maxTokensVal.textContent = maxTokensSlider.value;
-        });
+        // 滑块
+        bindSlider(el, 'rs-max-tokens', 'rs-max-tokens-v');
+        bindSlider(el, 'rs-temp', 'rs-temp-v');
+        bindSlider(el, 'rs-summary-threshold', 'rs-summary-threshold-v');
 
-        const tempSlider = container.querySelector('#rainy-set-temperature');
-        const tempVal = container.querySelector('#rainy-set-temperature-val');
-        tempSlider.addEventListener('input', () => {
-            tempVal.textContent = tempSlider.value;
-        });
+        // 获取模型
+        el.querySelector('#rs-fetch-models').addEventListener('click', async () => {
+            const url = el.querySelector('#rs-api-url').value.trim();
+            const key = el.querySelector('#rs-api-key').value.trim();
+            const sel = el.querySelector('#rs-api-model');
+            const hint = el.querySelector('#rs-model-hint');
 
-        // 获取模型列表
-        container.querySelector('#rainy-set-fetch-models').addEventListener('click', async () => {
-            const url = container.querySelector('#rainy-set-api-url').value.trim();
-            const key = container.querySelector('#rainy-set-api-key').value.trim();
-            const modelSelect = container.querySelector('#rainy-set-api-model');
-            const hint = container.querySelector('#rainy-set-model-hint');
-
-            if (!url) {
-                showToast('请先填写 API 地址', 'error');
-                return;
-            }
-
-            hint.textContent = '正在获取...';
-            hint.style.color = 'var(--rainy-accent)';
+            if (!url) { showToast('请先填写 API 地址', 'error'); return; }
+            hint.textContent = '获取中...';
+            hint.style.color = 'var(--rainy-screen-accent)';
 
             try {
                 const models = await fetchModelList(url, key);
-                modelSelect.innerHTML = models.map(m =>
-                    `<option value="${m}">${m}</option>`
-                ).join('');
-
-                // 如果之前有选过的模型，尝试恢复选择
-                const prevModel = settings.sub_api?.model;
-                if (prevModel && models.includes(prevModel)) {
-                    modelSelect.value = prevModel;
-                }
-
-                hint.textContent = `✅ 获取到 ${models.length} 个模型`;
-                hint.style.color = '#22c55e';
+                sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+                if (s.sub_api?.model && models.includes(s.sub_api.model)) sel.value = s.sub_api.model;
+                hint.textContent = `✅ ${models.length} 个模型`;hint.style.color = '#22c55e';
                 showToast(`获取到 ${models.length} 个模型`, 'success');
             } catch (e) {
                 hint.textContent = `❌ ${e.message}`;
                 hint.style.color = '#ef4444';
-
-                // Fallback：允许手动输入
-                modelSelect.innerHTML = '<option value="">获取失败，请手动输入</option>';
-                const manualInput = document.createElement('input');
-                manualInput.className = 'rainy-input';
-                manualInput.type = 'text';
-                manualInput.placeholder = '手动输入模型名称';
-                manualInput.id = 'rainy-set-api-model-manual';
-                manualInput.value = settings.sub_api?.model || '';
-                manualInput.style.marginTop = '6px';
-
-                const existingManual = container.querySelector('#rainy-set-api-model-manual');
-                if (existingManual) existingManual.remove();
-                modelSelect.parentElement.parentElement.appendChild(manualInput);
-
-                showToast('获取模型列表失败，可手动输入', 'error');
+                // fallback 手动输入
+                sel.innerHTML = '<option value="">获取失败</option>';
+                if (!el.querySelector('#rs-api-model-manual')) {
+                    const inp = document.createElement('input');
+                    inp.className = 'rainy-scr-input';
+                    inp.type = 'text';
+                    inp.placeholder = '手动输入模型名';
+                    inp.id = 'rs-api-model-manual';
+                    inp.value = s.sub_api?.model || '';
+                    inp.style.marginTop = '4px';
+                    sel.parentElement.parentElement.appendChild(inp);
+                }
+                showToast('获取失败，可手动输入', 'error');
             }
         });
 
-        // ComfyUI Workflow 上传
-        const comfyUploadBtn = container.querySelector('#rainy-set-comfy-upload');
-        const comfyFileInput = container.querySelector('#rainy-set-comfy-file');
-        const comfyStatus = container.querySelector('#rainy-set-comfy-workflow-status');
-
-        comfyUploadBtn.addEventListener('click', () => comfyFileInput.click());
-        comfyFileInput.addEventListener('change', (e) => {
+        // ComfyUI workflow上传
+        el.querySelector('#rs-comfy-upload').addEventListener('click', () => el.querySelector('#rs-comfy-file').click());
+        el.querySelector('#rs-comfy-file').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = (ev) => {
                 try {
-                    const workflow = JSON.parse(ev.target.result);
-                    // 临时存到 data 属性，保存时再写入 settings
-                    comfyUploadBtn.dataset.workflow = ev.target.result;
-                    comfyStatus.textContent = `✅ 已加载: ${file.name}`;
+                    JSON.parse(ev.target.result);
+                    el.querySelector('#rs-comfy-upload').dataset.workflow = ev.target.result;
+                    el.querySelector('#rs-comfy-status').textContent = `✅ ${file.name}`;
                     showToast('Workflow 已加载', 'success');
-                } catch {
-                    comfyStatus.textContent = '❌ JSON 解析失败';
-                    showToast('Workflow JSON 格式错误', 'error');
-                }
+                } catch { showToast('JSON 格式错误', 'error'); }
             };
             reader.readAsText(file);
         });
 
         // 添加小剧场类型
-        container.querySelector('#rainy-set-theater-add-type').addEventListener('click', () => {
-            const typesContainer = container.querySelector('#rainy-set-theater-types');
-            const index = typesContainer.children.length;
-            const newCard = document.createElement('div');
-            newCard.className = 'rainy-card';
-            newCard.dataset.typeIndex = index;
-            newCard.innerHTML = `
-                <div class="rainy-input-row" style="margin-bottom:8px;">
-                    <div class="rainy-field">
-                        <label class="rainy-field-label">类型名称</label>
-                        <input class="rainy-input rainy-theater-type-name" type="text" value="新类型">
-                    </div>
-                    <button class="rainy-btn rainy-btn-secondary rainy-btn-sm rainy-theater-type-delete" 
-                            style="color:#ef4444; align-self:flex-end;">✕</button>
-                </div>
-                <div class="rainy-field" style="margin-bottom:0;">
-                    <label class="rainy-field-label">提示词</label>
-                    <textarea class="rainy-textarea rainy-theater-type-prompt" rows="2">请输入提示词...</textarea>
-                </div>
-            `;
-            typesContainer.appendChild(newCard);
+        el.querySelector('#rs-theater-add').addEventListener('click', () => {
+            const box = el.querySelector('#rs-theater-types');
+            const idx = box.children.length;
+            box.insertAdjacentHTML('beforeend', theaterTypeCardHTML({ id: '', name: '新类型', prompt: '' }, idx));
+            bindDeleteBtns(box, '.rainy-theater-del');
+        });bindDeleteBtns(el.querySelector('#rs-theater-types'), '.rainy-theater-del');
 
-            // 绑定删除
-            newCard.querySelector('.rainy-theater-type-delete').addEventListener('click', () => {
-                newCard.remove();
-            });
+        // 添加自定义 QR
+        el.querySelector('#rs-qr-add').addEventListener('click', () => {
+            const box = el.querySelector('#rs-custom-qr');
+            const idx = box.children.length;
+            box.insertAdjacentHTML('beforeend', customQRCardHTML({ id: '', name: '新指令', command: '/trigger qr="名称"' }, idx));
+            bindDeleteBtns(box, '.rainy-qr-del');
         });
+        bindDeleteBtns(el.querySelector('#rs-custom-qr'), '.rainy-qr-del');
 
-        // 绑定已有的删除按钮
-        container.querySelectorAll('.rainy-theater-type-delete').forEach(btn => {
-            btn.addEventListener('click', () => {
-                btn.closest('.rainy-card').remove();
-            });
-        });
-
-        // 保存所有设置
-        container.querySelector('#rainy-set-save').addEventListener('click', () => {
+        // 保存
+        el.querySelector('#rs-save').addEventListener('click', () => {
             // 收集小剧场类型
-            const typeCards = container.querySelectorAll('#rainy-set-theater-types .rainy-card');
-            const types = Array.from(typeCards).map(card => ({
-                id: card.querySelector('.rainy-theater-type-name').value.trim().toLowerCase().replace(/\s+/g, '_') || crypto.randomUUID(),
-                name: card.querySelector('.rainy-theater-type-name').value.trim(),
-                prompt: card.querySelector('.rainy-theater-type-prompt').value.trim(),})).filter(t => t.name && t.prompt);
+            const typeCards = el.querySelectorAll('#rs-theater-types .rainy-scr-card');
+            const types = Array.from(typeCards).map(c => ({
+                id: c.querySelector('.rt-name').value.trim().toLowerCase().replace(/\s+/g, '_') || crypto.randomUUID(),
+                name: c.querySelector('.rt-name').value.trim(),
+                prompt: c.querySelector('.rt-prompt').value.trim(),
+            })).filter(t => t.name && t.prompt);
 
-            // 获取模型值（优先下拉栏，fallback 手动输入）
-            let modelValue = container.querySelector('#rainy-set-api-model').value;
-            const manualInput = container.querySelector('#rainy-set-api-model-manual');
-            if ((!modelValue || modelValue === '') && manualInput) {
-                modelValue = manualInput.value.trim();
-            }
+            // 收集自定义 QR
+            const qrCards = el.querySelectorAll('#rs-custom-qr .rainy-scr-card');
+            const customQR = Array.from(qrCards).map(c => ({
+                id: crypto.randomUUID(),
+                name: c.querySelector('.rq-name').value.trim(),
+                command: c.querySelector('.rq-cmd').value.trim(),
+            })).filter(q => q.name && q.command);
 
-            // 获取 workflow
-            let workflow = settings.comfyui?.workflow || null;
-            const workflowData = container.querySelector('#rainy-set-comfy-upload').dataset.workflow;
-            if (workflowData) {
-                try { workflow = JSON.parse(workflowData); } catch { }
-            }
+            // 模型
+            let model = el.querySelector('#rs-api-model').value;
+            const manual = el.querySelector('#rs-api-model-manual');
+            if (!model && manual) model = manual.value.trim();
+
+            // workflow
+            let workflow = s.comfyui?.workflow || null;
+            const wfData = el.querySelector('#rs-comfy-upload').dataset.workflow;
+            if (wfData) { try { workflow = JSON.parse(wfData); } catch {} }
 
             const newSettings = {
                 sub_api: {
-                    url: container.querySelector('#rainy-set-api-url').value.trim(),
-                    key: container.querySelector('#rainy-set-api-key').value.trim(),
-                    model: modelValue,
-                    max_tokens: parseInt(container.querySelector('#rainy-set-max-tokens').value),
-                    temperature: parseFloat(container.querySelector('#rainy-set-temperature').value),
+                    url: el.querySelector('#rs-api-url').value.trim(),
+                    key: el.querySelector('#rs-api-key').value.trim(),
+                    model,
+                    max_tokens: parseInt(el.querySelector('#rs-max-tokens').value),
+                    temperature: parseFloat(el.querySelector('#rs-temp').value),
                 },
                 nai: {
-                    key: container.querySelector('#rainy-set-nai-key').value.trim(),
-                    model: container.querySelector('#rainy-set-nai-model').value,
-                    sampler: settings.nai?.sampler || 'k_euler_ancestral',
-                    steps: parseInt(container.querySelector('#rainy-set-nai-steps').value),
-                    cfg_scale: parseFloat(container.querySelector('#rainy-set-nai-cfg').value),
-                    width: parseInt(container.querySelector('#rainy-set-nai-width').value),
-                    height: parseInt(container.querySelector('#rainy-set-nai-height').value),
-                    negative_prompt: container.querySelector('#rainy-set-nai-negative').value.trim(),
+                    key: el.querySelector('#rs-nai-key').value.trim(),
+                    model: el.querySelector('#rs-nai-model').value,
+                    sampler: s.nai?.sampler || 'k_euler_ancestral',
+                    steps: parseInt(el.querySelector('#rs-nai-steps').value),
+                    cfg_scale: parseFloat(el.querySelector('#rs-nai-cfg').value),
+                    width: parseInt(el.querySelector('#rs-nai-w').value),
+                    height: parseInt(el.querySelector('#rs-nai-h').value),
+                    negative_prompt: el.querySelector('#rs-nai-neg').value.trim(),
                 },
                 comfyui: {
-                    url: container.querySelector('#rainy-set-comfy-url').value.trim(),
-                    workflow: workflow,
-                    positive_node_id: container.querySelector('#rainy-set-comfy-pos-node').value.trim(),
-                    negative_node_id: container.querySelector('#rainy-set-comfy-neg-node').value.trim(),
+                    url: el.querySelector('#rs-comfy-url').value.trim(),
+                    workflow,
+                    positive_node_id: el.querySelector('#rs-comfy-pos').value.trim(),
+                    negative_node_id: el.querySelector('#rs-comfy-neg').value.trim(),
                 },
-                gallery: {
-                    prefix: container.querySelector('#rainy-set-gallery-prefix').value.trim(),
-                },
-                theater: {
-                    types: types,
-                },
+                gallery: { prefix: el.querySelector('#rs-gallery-prefix').value.trim() },
+                theater: { types },
                 summary: {
-                    qr_name: container.querySelector('#rainy-set-qr-name').value.trim() || '总结',
-                },fab_position: getSettings().fab_position, // 保留悬浮球位置
+                    qr_name: s.summary?.qr_name || '总结',
+                    qr_command: el.querySelector('#rs-summary-cmd').value.trim(),
+                    reminder_threshold: parseInt(el.querySelector('#rs-summary-threshold').value),
+                },
+                custom_qr: customQR,
+                fab_position: getSettings().fab_position,
+                show_fab: el.querySelector('#rs-show-fab').checked,
             };
 
             saveSettings(newSettings);
-            updateStatusBar(currentApiStatus);
-            EventBus.emit(RainyEvents.SETTINGS_CHANGED, newSettings);
+            updateStatusBarUI(apiStatus);
 
-            // 如果小剧场已初始化，刷新类型按钮
-            if (initializedChannels.has('theater')) {
-                initializedChannels.delete('theater');
-                const theaterContainer = document.getElementById('rainy-page-theater');
-                if (theaterContainer) initTheaterPage(theaterContainer);
-            }
+            // 更新悬浮球显隐
+            const fab = document.getElementById('rainy-fab');
+            if (fab) fab.style.display = newSettings.show_fab ? '' : 'none';
+
+            //刷新相关频道
+            reinitChannel('theater');
+            reinitChannel('summary');
 
             showToast('设置已保存 ✓', 'success');
+            EventBus.emit(RE.SETTINGS_CHANGED, newSettings);
+        });
+    }
+
+    // 设置页辅助函数
+    function theaterTypeCardHTML(t, i) {
+        return `
+            <div class="rainy-scr-card" data-idx="${i}">
+                <div class="rainy-scr-row" style="margin-bottom:6px;">
+                    <div class="rainy-scr-field" style="margin-bottom:0;">
+                        <input class="rainy-scr-input rt-name" type="text" value="${escapeHtml(t.name)}" placeholder="类型名">
+                    </div>
+                    <button class="rainy-scr-btn rainy-scr-btn-sm rainy-theater-del" style="color:#ef4444;">✕</button>
+                </div>
+                <div class="rainy-scr-field" style="margin-bottom:0;">
+                    <textarea class="rainy-scr-textarea rt-prompt" rows="2" placeholder="提示词">${escapeHtml(t.prompt)}</textarea>
+                </div>
+            </div>
+        `;
+    }
+
+    function customQRCardHTML(qr, i) {
+        return `
+            <div class="rainy-scr-card" data-idx="${i}">
+                <div class="rainy-scr-row" style="margin-bottom:6px;">
+                    <div class="rainy-scr-field" style="margin-bottom:0;">
+                        <input class="rainy-scr-input rq-name" type="text" value="${escapeHtml(qr.name)}" placeholder="按钮名称">
+                    </div>
+                    <button class="rainy-scr-btn rainy-scr-btn-sm rainy-qr-del" style="color:#ef4444;">✕</button>
+                </div>
+                <div class="rainy-scr-field" style="margin-bottom:0;">
+                    <input class="rainy-scr-input rq-cmd" type="text" value="${escapeHtml(qr.command)}" placeholder='/trigger qr="名称"'>
+                </div>
+            </div>
+        `;
+    }
+
+    function bindSlider(el, sliderId, valId) {
+        const slider = el.querySelector(`#${sliderId}`);
+        const val = el.querySelector(`#${valId}`);
+        if (slider && val) slider.addEventListener('input', () => { val.textContent = slider.value; });
+    }
+
+    function bindDeleteBtns(container, selector) {
+        if (!container) return;
+        container.querySelectorAll(selector).forEach(btn => {
+            btn.onclick = () => btn.closest('.rainy-scr-card').remove();
         });
     }
 
     // ═══════════════════════════════════════
-    // 📦 SECTION 15: 手机端 vh 修正
+    // 📦 SECTION 15: ST扩展面板入口
     // ═══════════════════════════════════════
 
-    function fixMobileVH() {
-        function setVH() {
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--rainy-vh', `${vh}px`);
+    function createSTSettingsPanel() {
+        // 创建 ST 扩展面板中的设置区域
+        const settingsHtml = `
+            <div id="rainy-player-st-settings" class="rainy-player-st-settings">
+                <div class="inline-drawer">
+                    <div class="inline-drawer-toggle inline-drawer-header">
+                        <b>🌧️ 雨季播放器</b>
+                        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+                    </div>
+                    <div class="inline-drawer-content">
+                        <button class="rainy-ext-open-btn" id="rainy-ext-open-btn">🎵 打开雨季播放器
+                        </button>
+                        <div class="rainy-ext-toggle-row">
+                            <span class="rainy-ext-toggle-label">显示悬浮球</span>
+                            <input type="checkbox" id="rainy-ext-show-fab" ${getSettings().show_fab !== false ? 'checked' : ''}>
+                        </div>
+                    </div>
+                </div></div>
+        `;
+
+        // 注入到 ST 的扩展设置区域
+        const extensionsSettings = document.getElementById('extensions_settings');
+        if (extensionsSettings) {
+            extensionsSettings.insertAdjacentHTML('beforeend', settingsHtml);
+
+            // 打开播放器按钮
+            document.getElementById('rainy-ext-open-btn')?.addEventListener('click', () => {
+                openPanel();});
+
+            // 悬浮球开关
+            document.getElementById('rainy-ext-show-fab')?.addEventListener('change', (e) => {
+                const show = e.target.checked;
+                updateSettings(s => { s.show_fab = show; return s; });
+                const fab = document.getElementById('rainy-fab');
+                if (fab) fab.style.display = show ? '' : 'none';
+            });
         }
-        setVH();
-        window.addEventListener('resize', setVH);
     }
 
     // ═══════════════════════════════════════
-    // 📦 SECTION 16: 插件入口
+    // 📦 SECTION 16: 手机端 VH 修正
+    // ═══════════════════════════════════════
+
+    function fixMobileVH() {
+        function set() { document.documentElement.style.setProperty('--rainy-vh', `${window.innerHeight * 0.01}px`); }
+        set();
+        window.addEventListener('resize', set);
+    }
+
+    // ═══════════════════════════════════════
+    // 📦 SECTION 17: 插件入口
     // ═══════════════════════════════════════
 
     function init() {
-        console.log('[RainyPlayer] 🌧️ 雨季播放器初始化中...');
+        console.log('[RainyPlayer] 🌧️ 初始化中...');
 
-        // 修正手机端 vh
         fixMobileVH();
 
-        // 创建悬浮球
+        const settings = getSettings();
+
+        // 悬浮球
         const fab = createFAB();
+        if (settings.show_fab === false) fab.style.display = 'none';
         document.body.appendChild(fab);
-
-        // 恢复悬浮球位置
         restoreFABPosition(fab);
-
-        // 悬浮球拖拽
         makeDraggable(fab);
 
-        // 创建主面板
+        // 主面板
         panelEl = createMainPanel();
         document.body.appendChild(panelEl);
 
-        // 初始化状态栏
-        updateStatusBar('idle');
+        // 状态栏
+        updateStatusBarUI('idle');
 
-        // 监听 ST 事件（如果可用）
+        // ST 扩展面板入口
+        createSTSettingsPanel();
+
+        // ST 事件监听
         try {
             if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) {
-                const context = SillyTavern.getContext();
-                //聊天切换时刷新摘要
-                if (context.eventSource) {
-                    const CHAT_CHANGED = context.eventTypes?.CHAT_CHANGED || 'chatLoaded';
-                    context.eventSource.on(CHAT_CHANGED, () => {
-                        if (initializedChannels.has('summary')) {
-                            initializedChannels.delete('summary');
-                            const summaryContainer = document.getElementById('rainy-page-summary');
-                            if (summaryContainer) initSummaryPage(summaryContainer);
-                        }
+                const ctx = SillyTavern.getContext();
+                if (ctx.eventSource) {
+                    const evt = ctx.eventTypes?.CHAT_CHANGED || 'chatLoaded';
+                    ctx.eventSource.on(evt, () => {
+                        //聊天切换时刷新摘要
+                        reinitChannel('summary');
                     });
                 }
             }
         } catch (e) {
-            console.warn('[RainyPlayer] ST 事件监听设置失败:', e);
+            console.warn('[RainyPlayer] ST 事件监听失败:', e);
         }
 
         console.log('[RainyPlayer] 🌧️ 初始化完成！');
     }
 
-    // ── 启动 ──
+    // 启动
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
+    } else if (typeof jQuery !== 'undefined') {
+        jQuery(init);
     } else {
-        // jQuery ready兼容
-        if (typeof jQuery !== 'undefined') {
-            jQuery(init);
-        } else {
-            init();
-        }
+        init();
     }
 
 })();
