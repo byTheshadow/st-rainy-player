@@ -58,6 +58,14 @@
             qr_command: '/trigger qr="总结"',
             reminder_threshold: 50,
         },
+        worldbook: {
+            default_depth: 4,
+            default_position: 4,   // ST position枚举: 0=before_char, 4=after_char
+            default_keyword: 'rainy_summary',
+            last_used_book: '',// 记住上次选择的世界书
+        },
+
+        
         custom_qr: [
             // { id: 'uuid', name: '总结', command: '/trigger qr="总结"' },
         ],
@@ -664,11 +672,66 @@
                 </div>
             </div>
 
-            <!-- 操作按钮 -->
+                       <!-- 操作按钮 -->
             <div class="rainy-summary-actions">
                 <button class="rainy-scr-btn is-primary" id="rainy-summary-refresh">🔄 刷新摘要</button>
-                <button class="rainy-scr-btn" id="rainy-summary-trigger">📝 发送总结指令</button>
+                <button class="rainy-scr-btn" id="rainy-summary-trigger">📝 发送总结指令</button><button class="rainy-scr-btn" id="rainy-summary-to-wb">📖 写入世界书</button>
             </div>
+
+            <!-- 写入世界书弹出面板（默认隐藏） -->
+            <div class="rainy-wb-overlay" id="rainy-wb-overlay" style="display:none;">
+                <div class="rainy-wb-panel">
+                    <div class="rainy-wb-panel-header">
+                        <span>📖 写入世界书</span>
+                        <button class="rainy-wb-panel-close" id="rainy-wb-close">✕</button>
+                    </div>
+                    <div class="rainy-wb-panel-body">
+                        <div class="rainy-scr-field">
+                            <label class="rainy-scr-label">目标世界书</label>
+                            <div class="rainy-scr-row">
+                                <div class="rainy-scr-field" style="margin-bottom:0;">
+                                    <select class="rainy-scr-select" id="rainy-wb-book-select">
+                                        <option value="">点击右侧刷新获取列表</option>
+                                    </select>
+                                </div>
+                                <button class="rainy-scr-btn rainy-scr-btn-sm" id="rainy-wb-refresh-books">🔄</button>
+                            </div><div class="rainy-scr-hint" id="rainy-wb-book-hint"></div>
+                        </div>
+
+                        <div class="rainy-scr-field">
+                            <label class="rainy-scr-label">关键词 (Key)</label>
+                            <input class="rainy-scr-input" type="text" id="rainy-wb-keyword" placeholder="rainy_summary">
+                            <div class="rainy-scr-hint">世界书条目的触发关键词，多个用逗号分隔</div>
+                        </div>
+
+                        <div class="rainy-scr-row">
+                            <div class="rainy-scr-field">
+                                <label class="rainy-scr-label">深度 (Depth)</label>
+                                <input class="rainy-scr-input" type="number" id="rainy-wb-depth" value="4" min="0" max="999"></div>
+                            <div class="rainy-scr-field">
+                                <label class="rainy-scr-label">位置 (Position)</label>
+                                <select class="rainy-scr-select" id="rainy-wb-position">
+                                    <option value="0">Before Char Defs</option>
+                                    <option value="4" selected>After Char Defs</option>
+                                <option value="1">Before AN (Top)</option>
+                                    <option value="2">After AN (Bottom)</option>
+                                    <option value="3">At Depth</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="rainy-scr-field">
+                            <label class="rainy-scr-label">内容</label>
+                            <textarea class="rainy-scr-textarea" id="rainy-wb-content" rows="6" placeholder="将写入世界书的文本..."></textarea>
+                        </div>
+                    </div>
+                    <div class="rainy-wb-panel-footer">
+                        <button class="rainy-scr-btn" id="rainy-wb-cancel">取消</button>
+                        <button class="rainy-scr-btn is-primary" id="rainy-wb-confirm">✅ 确认写入</button>
+                    </div>
+                </div>
+            </div>
+
 
             <div class="rainy-scr-divider"></div>
 
@@ -811,6 +874,201 @@
                 }
             });
         });
+                // ── 写入世界书 ──
+
+        const wbOverlay = el.querySelector('#rainy-wb-overlay');
+        const wbBookSelect = el.querySelector('#rainy-wb-book-select');
+        const wbKeyword = el.querySelector('#rainy-wb-keyword');
+        const wbDepth = el.querySelector('#rainy-wb-depth');
+        const wbPosition = el.querySelector('#rainy-wb-position');
+        const wbContent = el.querySelector('#rainy-wb-content');
+        const wbBookHint = el.querySelector('#rainy-wb-book-hint');
+
+        // 用默认设置填充
+        const wbDefaults = getSettings().worldbook || {};
+        wbKeyword.value = wbDefaults.default_keyword || 'rainy_summary';
+        wbDepth.value = wbDefaults.default_depth ?? 4;
+        wbPosition.value = String(wbDefaults.default_position ?? 4);
+
+        // 打开写入世界书面板
+        el.querySelector('#rainy-summary-to-wb').addEventListener('click', () => {
+            // 填入当前显示的摘要内容
+            if (allSummaries.length > 0) {
+                const item = allSummaries[currentIndex];
+                wbContent.value = item.content;} else {
+                wbContent.value = '';
+            }
+            //恢复上次选择的世界书
+            if (wbDefaults.last_used_book && wbBookSelect.querySelector(`option[value="${CSS.escape(wbDefaults.last_used_book)}"]`)) {
+                wbBookSelect.value = wbDefaults.last_used_book;
+            }
+            wbOverlay.style.display = 'flex';
+        });
+
+        // 关闭
+        el.querySelector('#rainy-wb-close').addEventListener('click', () => { wbOverlay.style.display = 'none'; });
+        el.querySelector('#rainy-wb-cancel').addEventListener('click', () => { wbOverlay.style.display = 'none'; });
+
+        // 点击 overlay 背景关闭
+        wbOverlay.addEventListener('click', (e) => {
+            if (e.target === wbOverlay) wbOverlay.style.display = 'none';
+        });
+
+        // 刷新世界书列表
+        el.querySelector('#rainy-wb-refresh-books').addEventListener('click', async () => {
+            await refreshWorldBookList();
+        });
+
+        async function refreshWorldBookList() {
+            wbBookHint.textContent = '获取中...';
+            wbBookHint.style.color = 'var(--rainy-screen-accent)';
+
+            try {
+                if (typeof SillyTavern === 'undefined' || !SillyTavern.getContext) throw new Error('ST 环境不可用');
+                const ctx = SillyTavern.getContext();
+
+                const books = new Set();
+
+                // 获取全局世界书
+                try {
+                    const globalResult = await ctx.executeSlashCommandsWithOptions('/getglobalwi', { handleParserErrors: false, handleExecutionErrors: false });
+                    const globalPipe = globalResult?.pipe;
+                    if (globalPipe && typeof globalPipe === 'string' && globalPipe.trim()) {
+                        globalPipe.split(',').map(s => s.trim()).filter(Boolean).forEach(b => books.add(b));
+                    }
+                } catch (e) { console.warn('[RainyPlayer] getglobalwi failed:', e); }
+
+                // 获取角色绑定世界书
+                try {
+                    const charResult = await ctx.executeSlashCommandsWithOptions('/getcharwi', { handleParserErrors: false, handleExecutionErrors: false });
+                    const charPipe = charResult?.pipe;
+                    if (charPipe && typeof charPipe === 'string' && charPipe.trim()) {
+                        charPipe.split(',').map(s => s.trim()).filter(Boolean).forEach(b => books.add(b));
+                    }
+                } catch (e) { console.warn('[RainyPlayer] getcharwi failed:', e); }
+
+                // 获取聊天绑定世界书
+                try {
+                    const chatResult = await ctx.executeSlashCommandsWithOptions('/getchatwi', { handleParserErrors: false, handleExecutionErrors: false });
+                    const chatPipe = chatResult?.pipe;
+                    if (chatPipe && typeof chatPipe === 'string' && chatPipe.trim()) {
+                        chatPipe.split(',').map(s => s.trim()).filter(Boolean).forEach(b => books.add(b));
+                    }
+                } catch (e) { console.warn('[RainyPlayer] getchatwi failed:', e); }
+
+                // 获取 persona 绑定世界书
+                try {
+                    const personaResult = await ctx.executeSlashCommandsWithOptions('/getpersonawi', { handleParserErrors: false, handleExecutionErrors: false });
+                    const personaPipe = personaResult?.pipe;
+                    if (personaPipe && typeof personaPipe === 'string' && personaPipe.trim()) {
+                        personaPipe.split(',').map(s => s.trim()).filter(Boolean).forEach(b => books.add(b));
+                    }
+                } catch (e) { console.warn('[RainyPlayer] getpersonawi failed:', e); }
+
+                if (books.size === 0) {
+                    wbBookSelect.innerHTML = '<option value="">未找到已激活的世界书</option>';
+                    wbBookHint.textContent = '⚠️ 请确保至少激活了一个世界书';
+                    wbBookHint.style.color = '#ca8a04';
+                    return;
+                }
+
+                const bookArray = [...books];
+                wbBookSelect.innerHTML = bookArray.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+
+                // 恢复上次选择
+                if (wbDefaults.last_used_book && bookArray.includes(wbDefaults.last_used_book)) {
+                    wbBookSelect.value = wbDefaults.last_used_book;
+                }
+
+                wbBookHint.textContent = `✅ 找到 ${bookArray.length} 个世界书`;
+                wbBookHint.style.color = '#22c55e';
+                showToast(`找到 ${bookArray.length} 个世界书`, 'success');
+
+            } catch (e) {
+                wbBookHint.textContent = `❌ ${e.message}`;
+                wbBookHint.style.color = '#ef4444';
+                showToast('获取世界书列表失败: ' + e.message, 'error');
+            }
+        }
+
+        // 确认写入
+        el.querySelector('#rainy-wb-confirm').addEventListener('click', async () => {
+            const bookName = wbBookSelect.value.trim();
+            const keyword = wbKeyword.value.trim();
+            const depth = parseInt(wbDepth.value) || 4;
+            const position = parseInt(wbPosition.value) || 4;
+            const content = wbContent.value.trim();
+
+            if (!bookName) { showToast('请先选择目标世界书', 'error'); return; }
+            if (!keyword) { showToast('请填写关键词', 'error'); return; }
+            if (!content) { showToast('内容不能为空', 'error'); return; }
+
+            const confirmBtn = el.querySelector('#rainy-wb-confirm');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '⏳ 写入中...';
+
+            try {
+                if (typeof SillyTavern === 'undefined' || !SillyTavern.getContext) throw new Error('ST 环境不可用');
+                const ctx = SillyTavern.getContext();
+
+                // 步骤1: 用/createwi 创建条目，获取 UID
+                // /createwi file="书名" key="关键词" 内容
+                //需要对参数中的引号做转义
+                const safeBook = bookName.replace(/"/g, '\\"');
+                const safeKey = keyword.replace(/"/g, '\\"');
+
+                const createResult = await ctx.executeSlashCommandsWithOptions(
+                    `/createwi file="${safeBook}" key="${safeKey}" ${content}`,
+                    { handleParserErrors: false, handleExecutionErrors: false }
+                );
+
+                const uid = createResult?.pipe;
+                if (!uid || typeof uid !== 'string' || !uid.trim()) {
+                    throw new Error('创建条目失败：未返回 UID');
+                }
+
+                const trimmedUid = uid.trim();
+                console.log('[RainyPlayer] 世界书条目已创建, UID:', trimmedUid);
+
+                // 步骤2: 用 /setwi field设置 depth 和 position
+                // /setwi field=depth file="书名" uid=UID 值
+                try {
+                    await ctx.executeSlashCommandsWithOptions(
+                        `/setwi field=depth file="${safeBook}" uid=${trimmedUid} ${depth}`,
+                        { handleParserErrors: false, handleExecutionErrors: false }
+                    );
+                } catch (e) { console.warn('[RainyPlayer] 设置 depth 失败:', e); }
+
+                try {
+                    await ctx.executeSlashCommandsWithOptions(
+                        `/setwi field=position file="${safeBook}" uid=${trimmedUid} ${position}`,
+                        { handleParserErrors: false, handleExecutionErrors: false }
+                    );
+                } catch (e) { console.warn('[RainyPlayer] 设置 position 失败:', e); }
+
+                // 记住上次使用的世界书
+                updateSettings(s => {
+                    if (!s.worldbook) s.worldbook = {};
+                    s.worldbook.last_used_book = bookName;
+                    return s;
+                });
+
+                wbOverlay.style.display = 'none';
+                showToast('✅ 已成功写入世界书！', 'success');
+
+            } catch (e) {
+                console.error('[RainyPlayer] 写入世界书失败:', e);
+                showToast('写入失败: ' + e.message, 'error');// Fallback: 复制到剪贴板
+                try {
+                    await navigator.clipboard.writeText(content);
+                    showToast('已复制内容到剪贴板，请手动粘贴到世界书', 'warning', 5000);
+                } catch { /*剪贴板也失败了就算了 */ }
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = '✅ 确认写入';
+            }
+        });
+
     }
 
     function escapeHtml(str) {
@@ -994,6 +1252,34 @@
                 <div class="rainy-scr-hint">距上次总结超过此楼层数时显示提醒</div>
                 </div>
             </div>
+                        <!-- ── 世界书默认设置 ── -->
+            <div class="rainy-settings-section">
+                <div class="rainy-scr-section-title">世界书默认设置</div>
+                <div class="rainy-scr-hint" style="margin-bottom:8px;">写入世界书时的默认值</div>
+
+                <div class="rainy-scr-field">
+                    <label class="rainy-scr-label">默认关键词</label>
+                    <input class="rainy-scr-input" type="text" id="rs-wb-keyword" placeholder="rainy_summary" value="${escapeHtml(s.worldbook?.default_keyword ||'rainy_summary')}">
+                </div>
+
+                <div class="rainy-scr-row">
+                    <div class="rainy-scr-field">
+                        <label class="rainy-scr-label">默认深度</label>
+                        <input class="rainy-scr-input" type="number" id="rs-wb-depth" value="${s.worldbook?.default_depth ?? 4}" min="0" max="999">
+                    </div>
+                    <div class="rainy-scr-field">
+                        <label class="rainy-scr-label">默认位置</label>
+                        <select class="rainy-scr-select" id="rs-wb-position">
+                            <option value="0" ${(s.worldbook?.default_position ?? 4) === 0 ? 'selected' : ''}>Before Char Defs</option>
+                            <option value="4" ${(s.worldbook?.default_position ?? 4) === 4 ? 'selected' : ''}>After Char Defs</option>
+                            <option value="1" ${(s.worldbook?.default_position ?? 4) === 1 ? 'selected' : ''}>Before AN (Top)</option>
+                            <option value="2" ${(s.worldbook?.default_position ?? 4) === 2 ? 'selected' : ''}>After AN (Bottom)</option>
+                            <option value="3" ${(s.worldbook?.default_position ?? 4) === 3 ? 'selected' : ''}>At Depth</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
 
             <!-- ── 自定义 QR 快捷指令 ── -->
             <div class="rainy-settings-section">
@@ -1159,6 +1445,13 @@
                     qr_command: el.querySelector('#rs-summary-cmd').value.trim(),
                     reminder_threshold: parseInt(el.querySelector('#rs-summary-threshold').value),
                 },
+                 worldbook: {
+                    default_keyword: el.querySelector('#rs-wb-keyword').value.trim() || 'rainy_summary',
+                    default_depth: parseInt(el.querySelector('#rs-wb-depth').value) || 4,
+                    default_position: parseInt(el.querySelector('#rs-wb-position').value) || 4,
+                    last_used_book: getSettings().worldbook?.last_used_book || '',
+                },
+
                 custom_qr: customQR,
                 fab_position: getSettings().fab_position,
                 show_fab: el.querySelector('#rs-show-fab').checked,
