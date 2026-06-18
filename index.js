@@ -10,16 +10,7 @@
     // 📦SECTION 1: 常量& 配置
     // ═══════════════════════════════════════
 
-    const PLUGIN_NAME = 'rainy-player';
-
-   const CHANNELS = [
-    { id: 'theater',  icon: iconCircleUp,    label: '剧场' },
-    { id: 'radio',    icon: iconCircleLeft,  label: '电台' },
-    { id: 'summary',  icon: iconCircleCenter,label: '摘要' },
-    { id: 'gallery',  icon: iconCircleRight, label: '画廊' },
-    { id: 'settings', icon: iconCircleDown,  label: '设置' },
-];
-const iconCircleUp = `
+  const iconCircleUp = `
 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
   <path d="M12 16V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -52,6 +43,17 @@ const iconCircleCenter = `
   <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
   <circle cx="12" cy="12" r="3.2" fill="currentColor"/>
 </svg>`;
+
+const PLUGIN_NAME = 'rainy-player';
+
+const CHANNELS = [
+    { id: 'theater',  icon: iconCircleUp,     label: '剧场' },
+    { id: 'radio',    icon: iconCircleLeft,   label: '电台' },
+    { id: 'summary',  icon: iconCircleCenter, label: '摘要' },
+    { id: 'gallery',  icon: iconCircleRight,  label: '画廊' },
+    { id: 'settings', icon: iconCircleDown,   label: '设置' },
+];
+
 
 
     const DEFAULT_SETTINGS = {
