@@ -148,6 +148,61 @@
         SETTINGS_CHANGED: 'settings_changed',
         API_STATUS: 'api_status',
         CHANNEL_CHANGED: 'channel_changed',};
+            function renderMarkdown(text) {
+        if (!text) return '';
+        let html = escapeHtml(text);
+
+        // 代码块 ``````
+        html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="rainy-md-codeblock"><code>$2</code></pre>');
+
+        // 行内代码 `...`
+        html = html.replace(/`([^`]+)`/g, '<code class="rainy-md-code">$1</code>');
+
+        // 标题 ### / ## / #
+        html = html.replace(/^### (.+)$/gm, '<h4 class="rainy-md-h4">$1</h4>');
+        html = html.replace(/^## (.+)$/gm, '<h3 class="rainy-md-h3">$1</h3>');
+        html = html.replace(/^# (.+)$/gm, '<h2 class="rainy-md-h2">$1</h2>');
+
+        //粗体 **...**
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+        // 斜体 *...*
+        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+        // 删除线 ~~...~~
+        html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+        // 无序列表 - item
+        html = html.replace(/^[-*] (.+)$/gm, '<li class="rainy-md-li">$1</li>');
+        html = html.replace(/((?:<li class="rainy-md-li">.*<\/li>\n?)+)/g, '<ul class="rainy-md-ul">$1</ul>');
+
+        // 有序列表 1. item
+        html = html.replace(/^\d+\. (.+)$/gm, '<li class="rainy-md-oli">$1</li>');
+        html = html.replace(/((?:<li class="rainy-md-oli">.*<\/li>\n?)+)/g, '<ol class="rainy-md-ol">$1</ol>');
+
+        // 引用 >
+        html = html.replace(/^&gt; (.+)$/gm, '<blockquote class="rainy-md-quote">$1</blockquote>');
+
+        // 水平线 ---
+        html = html.replace(/^---$/gm, '<hr class="rainy-md-hr">');
+
+        // 换行：连续两个换行 → 段落，单个换行 → <br>
+        html = html.replace(/\n\n/g, '</p><p class="rainy-md-p">');
+        html = html.replace(/\n/g, '<br>');
+
+        // 包裹在段落中
+        html = '<p class="rainy-md-p">' + html + '</p>';
+
+        // 清理空段落
+        html = html.replace(/<p class="rainy-md-p"><\/p>/g, '');
+        html = html.replace(/<p class="rainy-md-p">(<h[234])/g, '$1');
+        html = html.replace(/(<\/h[234]>)<\/p>/g, '$1');
+        html = html.replace(/<p class="rainy-md-p">(<ul|<ol|<blockquote|<pre|<hr)/g, '$1');
+        html = html.replace(/(<\/ul>|<\/ol>|<\/blockquote>|<\/pre>)<\/p>/g, '$1');
+
+        return html;
+    }
+
 
     // ═══════════════════════════════════════
     // 📦 SECTION 4: 副API
@@ -621,7 +676,7 @@
                     ],
                     max_chat_history: 20,
                 });
-                out.textContent = result;
+                out.innerHTML = renderMarkdown(result);
                 rerollBtn.disabled = false;
                 exportBtn.disabled = false;
 
@@ -726,12 +781,13 @@
                 });
 
                 const items = parseRadioNews(result);
-                newsEl.innerHTML = items.map(item => `
+                                newsEl.innerHTML = items.map(item => `
                     <div class="rainy-radio-news-card">
-                        <div class="rainy-radio-news-title">${item.title}</div>
-                        <div class="rainy-radio-news-body">${item.body}</div>
+                        <div class="rainy-radio-news-title">${escapeHtml(item.title)}</div>
+                        <div class="rainy-radio-news-body">${renderMarkdown(item.body)}</div>
                     </div>
                 `).join('');
+
 
                 marquee.textContent = `▸ ${items.length} NEWS RECEIVED ▸ ${new Date().toLocaleTimeString()} ▸▸▸`;
 
