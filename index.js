@@ -71,6 +71,10 @@
         ],
         fab_position: { x: null, y: null },
         show_fab: true,
+        fab_position: { x: null, y: null },
+show_fab: true,
+theme: 'default',
+
     };
       
     function uuid() {
@@ -85,6 +89,21 @@
         return v.toString(16);
     });
 }
+const THEMES = {
+    default: {
+        name: '清透白蓝',
+    },
+    mono: {
+        name: '黑白极简',
+    },
+};
+
+function applyTheme(themeName) {
+    const theme = THEMES[themeName] ? themeName : 'default';
+    document.documentElement.setAttribute('data-theme', theme);
+    storage.set('theme', theme);
+}
+
 
 
 
@@ -1596,6 +1615,14 @@ try {
                 </div>
                 <button class="rainy-scr-btn rainy-scr-btn-sm" id="rs-qr-add" style="margin-top:6px;">＋ 添加指令</button>
             </div>
+            <div class="rainy-setting-item">
+    <label>UI 主题</label>
+    <select id="rainy-theme-select" class="rainy-scr-select">
+        <option value="default">清透白蓝</option>
+        <option value="mono">黑白极简</option>
+    </select>
+</div>
+
 
             <!-- ── 显示设置 ── -->
             <div class="rainy-settings-section">
@@ -1616,6 +1643,15 @@ try {
         `;
 
         // ── 事件绑定 ──
+                const themeSelect = el.querySelector('#rainy-theme-select');
+        if (themeSelect) {
+            themeSelect.value = storage.get('theme', 'default');
+            themeSelect.addEventListener('change', (e) => {
+                applyTheme(e.target.value);
+                showToast('主题已切换', 'success');
+            });
+        }
+
 
         // 滑块
         bindSlider(el, 'rs-max-tokens', 'rs-max-tokens-v');
@@ -1811,6 +1847,7 @@ try {
             </div>
         `;
     }
+    
 
     function bindSlider(el, sliderId, valId) {
         const slider = el.querySelector(`#${sliderId}`);
@@ -1884,8 +1921,11 @@ try {
 
     function init() {
         console.log('[RainyPlayer] 🌧️ 初始化中...');
+    
 
         fixMobileVH();
+        applyTheme(storage.get('theme', 'default'));
+
 
         const settings = getSettings();
 
