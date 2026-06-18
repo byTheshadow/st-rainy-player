@@ -72,6 +72,14 @@
         fab_position: { x: null, y: null },
         show_fab: true,
     };
+        function uuid() {
+        try { return uuid(); }
+        catch { return 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, c => {
+            const r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        }); }
+    }
+
 
     // ═══════════════════════════════════════
     // 📦 SECTION 2: Storage
@@ -618,7 +626,7 @@
                 exportBtn.disabled = false;
 
                 storage.update('theater_history', [], list => {
-                    list.unshift({ id: crypto.randomUUID(), type_id: type.id, type_name: type.name, content: result, created_at: Date.now(), starred: false });
+                    list.unshift({ id: uuid(), type_id: type.id, type_name: type.name, content: result, created_at: Date.now(), starred: false });
                     return list.slice(0, 50);
                 });
                 refreshTheaterHistory(el);
@@ -728,7 +736,7 @@
                 marquee.textContent = `▸ ${items.length} NEWS RECEIVED ▸ ${new Date().toLocaleTimeString()} ▸▸▸`;
 
                 storage.update('radio_history', [], list => {
-                    list.unshift({ id: crypto.randomUUID(), content: result, created_at: Date.now() });
+                    list.unshift({ id: uuid(), content: result, created_at: Date.now() });
                     return list.slice(0, 20);
                 });
             } catch (e) {
@@ -1546,7 +1554,7 @@ try {
             // 收集小剧场类型
             const typeCards = el.querySelectorAll('#rs-theater-types .rainy-scr-card');
             const types = Array.from(typeCards).map(c => ({
-                id: c.querySelector('.rt-name').value.trim().toLowerCase().replace(/\s+/g, '_') || crypto.randomUUID(),
+                id: c.querySelector('.rt-name').value.trim().toLowerCase().replace(/\s+/g, '_') || uuid(),
                 name: c.querySelector('.rt-name').value.trim(),
                 prompt: c.querySelector('.rt-prompt').value.trim(),
             })).filter(t => t.name && t.prompt);
@@ -1554,7 +1562,7 @@ try {
             // 收集自定义 QR
             const qrCards = el.querySelectorAll('#rs-custom-qr .rainy-scr-card');
             const customQR = Array.from(qrCards).map(c => ({
-                id: crypto.randomUUID(),
+                id: uuid(),
                 name: c.querySelector('.rq-name').value.trim(),
                 command: c.querySelector('.rq-cmd').value.trim(),
             })).filter(q => q.name && q.command);
