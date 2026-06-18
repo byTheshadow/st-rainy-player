@@ -72,13 +72,20 @@
         fab_position: { x: null, y: null },
         show_fab: true,
     };
-        function uuid() {
-        try { return uuid(); }
-        catch { return 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, c => {
-            const r = Math.random() * 16 | 0;
-            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-        }); }
-    }
+      
+    function uuid() {
+    try {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+    } catch {}
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : ((r & 0x3) | 0x8);
+        return v.toString(16);
+    });
+}
+
 
 
     // ═══════════════════════════════════════
@@ -707,34 +714,61 @@
 
         refreshTheaterHistory(el);
     }
+function refreshTheaterHistory(el) {
+    const box = el.querySelector('#rainy-theater-history');
+    const history = storage.get('theater_history', []);
 
-    function refreshTheaterHistory(el) {
-        const box = el.querySelector('#rainy-theater-history');
-        const history = storage.get('theater_history', []);
-        if (!history.length) {
-            box.innerHTML = '<div class="rainy-scr-empty"><div class="rainy-scr-empty-text" style="font-size:11px;">暂无记录</div></div>';
-            return;
-        }
-        box.innerHTML = history.slice(0, 10).map(item => `
-            <div class="rainy-scr-card" style="cursor:pointer;" data-hid="${item.id}">
-                <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
-                    <span style="font-size:10px; color:var(--rainy-screen-accent); font-weight:600;">${item.type_name}</span>
-                    <span style="font-size:9px; color:var(--rainy-screen-text-dim);">${new Date(item.created_at).toLocaleString()}</span>
-                </div>
-                <div style="font-size:11px; color:var(--rainy-screen-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.content.substring(0, 50)}...</div>
-            </div>
-        `).join('');
-
-        box.querySelectorAll('.rainy-scr-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const item = history.find(h => h.id === card.dataset.hid);
-                if (item) {
-                    el.querySelector('#rainy-theater-output').textContent = item.content;
-                    el.querySelector('#rainy-theater-export').disabled = false;
-                }
-            });
-        });
+    if (!history.length) {
+        box.innerHTML = '<div class="rainy-scr-empty"><div class="rainy-scr-empty-text" style="font-size:11px;">暂无记录</div></div>';
+        return;
     }
+
+    box.innerHTML = history.slice(0, 10).map(item => `
+        <div class="rainy-scr-card ${item.starred ? 'is-starred' : ''}" style="cursor:pointer;" data-hid="${item.id}">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:3px;">
+                <div style="display:flex; gap:6px; align-items:center; min-width:0;">
+                    <span style="font-size:10px; color:var(--rainy-screen-accent); font-weight:600;">${item.type_name}</span>
+                    ${item.starred ? '<span style="font-size:10px;">⭐</span>' : ''}
+                </div>
+                <div style="display:flex; gap:6px; flex-shrink:0;">
+                    <button class="rainy-mini-icon-btn" data-action="star" title="收藏/取消收藏">⭐</button>
+                    <button class="rainy-mini-icon-btn" data-action="delete" title="删除">🗑</button>
+                </div>
+            </div>
+            <div style="font-size:9px; color:var(--rainy-screen-text-dim); margin-bottom:4px;">${new Date(item.created_at).toLocaleString()}</div>
+            <div style="font-size:11px; color:var(--rainy-screen-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.content.substring(0, 50))}${item.content.length > 50 ? '...' : ''}</div>
+        </div>
+    `).join('');
+
+    box.querySelectorAll('.rainy-scr-card').forEach(card => {
+        const item = history.find(h => h.id === card.dataset.hid);
+        if (!item) return;
+
+        card.addEventListener('click', (e) => {
+            const actionBtn = e.target.closest('button[data-action]');
+            if (actionBtn) return;
+
+            el.querySelector('#rainy-theater-output').innerHTML = renderMarkdown(item.content);
+            el.querySelector('#rainy-theater-export').disabled = false;
+            el.querySelector('#rainy-theater-reroll').disabled = false;
+        });
+
+        card.querySelector('[data-action="star"]').addEventListener('click', (e) => {
+            e.stopPropagation();
+            storage.update('theater_history', [], list => {
+                return list.map(h => h.id === item.id ? { ...h, starred: !h.starred } : h);
+            });
+            refreshTheaterHistory(el);
+        });
+
+        card.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!confirm('确定删除这条小剧场历史吗？')) return;
+            storage.update('theater_history', [], list => list.filter(h => h.id !== item.id));
+            refreshTheaterHistory(el);
+        });
+    });
+}
 
     // ═══════════════════════════════════════
     // 📦 SECTION 11: 世界电台
@@ -811,6 +845,54 @@
         if (!items.length) items.push({ title: '广播速报', body: text });
         return items;
     }
+function refreshRadioHistory(el) {
+    const box = el.querySelector('#rainy-radio-history');
+    const history = storage.get('radio_history', []);
+
+    if (!history.length) {
+        box.innerHTML = '<div class="rainy-scr-empty"><div class="rainy-scr-empty-text" style="font-size:11px;">暂无记录</div></div>';
+        return;
+    }
+
+    box.innerHTML = history.slice(0, 10).map(item => `
+        <div class="rainy-scr-card" style="cursor:pointer;" data-hid="${item.id}">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:3px;">
+                <span style="font-size:10px; color:var(--rainy-screen-accent); font-weight:600;">广播记录</span>
+                <button class="rainy-mini-icon-btn" data-action="delete" title="删除">🗑</button>
+            </div>
+            <div style="font-size:9px; color:var(--rainy-screen-text-dim); margin-bottom:4px;">${new Date(item.created_at).toLocaleString()}</div>
+            <div style="font-size:11px; color:var(--rainy-screen-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.content.substring(0, 50))}${item.content.length > 50 ? '...' : ''}</div>
+        </div>
+    `).join('');
+
+    box.querySelectorAll('.rainy-scr-card').forEach(card => {
+        const item = history.find(h => h.id === card.dataset.hid);
+        if (!item) return;
+
+        card.addEventListener('click', (e) => {
+            const actionBtn = e.target.closest('button[data-action]');
+            if (actionBtn) return;
+
+            const newsEl = el.querySelector('#rainy-radio-news');
+            const items = parseRadioNews(item.content);
+            newsEl.innerHTML = items.map(n => `
+                <div class="rainy-radio-news-card">
+                    <div class="rainy-radio-news-title">${escapeHtml(n.title)}</div>
+                    <div class="rainy-radio-news-body">${renderMarkdown(n.body)}</div>
+                </div>
+            `).join('');
+        });
+
+        card.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!confirm('确定删除这条广播历史吗？')) return;
+            storage.update('radio_history', [], list => list.filter(h => h.id !== item.id));
+            refreshRadioHistory(el);
+        });
+    });
+    refreshRadioHistory(el);
+
+}
 
     // ═══════════════════════════════════════
     // 📦 SECTION 12: 摘要站（多条+ 翻页+ 提醒 + QR）
