@@ -554,10 +554,15 @@
     :root { --rainy-fab-size: 56px; }
     
     .rainy-panel {
-        width: 92vw; height: 85dvh;
-        bottom: 24px; right: 4vw; /* 悬浮在屏幕中心/底部 */
-        border-radius: 44px; /* 极简现代手机大圆角 */
-        box-shadow: 0 30px 60px rgba(14,165,233,0.2), inset 0 2px 4px rgba(255,255,255,1);
+        width: 100vw;
+        height: 100dvh;
+        bottom: 0; 
+        right: 0;
+        left: 0;
+        top: 0;
+        border-radius: 0;
+        box-shadow: none;
+        /* 手机端全屏，不留任何间距 */
     }
     
     .rainy-mp3-tab-label { display: none; }
@@ -568,6 +573,7 @@
     
     .rainy-toast-container { bottom: 90px; left: 16px; right: 16px; transform: none; }
     .rainy-toast { max-width: 100%; }
-}
+    
     .rainy-wb-panel { width: 96%; max-height: 92%; }
     .rainy-wb-panel-close { min-width: 44px; min-height: 44px; }
+}
