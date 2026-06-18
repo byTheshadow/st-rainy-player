@@ -15,13 +15,14 @@
     /* 屏幕区域：天空蓝/冰川透亮 */
     --rainy-screen-bezel: #ffffff;
     --rainy-screen-bg: linear-gradient(160deg, #f0f9ff 0%, #e0f2fe 50%, #bae6fd 100%);
-    --rainy-screen-glow: rgba(255, 255, 255, 0.8);
+    --rainy-screen-glow: rgba(14, 165, 233, 0.25); /* 调整为清透蓝色辉光 */
     --rainy-screen-text: #0284c7;
     --rainy-screen-text-bright: #0369a1;
     --rainy-screen-text-dim: #38bdf8;
     --rainy-screen-accent: #0ea5e9;
     --rainy-screen-accent-bright: #38bdf8;
     --rainy-screen-border: rgba(255, 255, 255, 0.8);
+    --rainy-watermark-color: #0ea5e9; /* 新增：白蓝主题下的水印颜色 */
 
     /* 玻璃态卡片与控件 */
     --rainy-screen-card-bg: rgba(255, 255, 255, 0.4);
@@ -33,6 +34,10 @@
     --rainy-btn-shadow:
         8px 8px 16px rgba(14, 165, 233, 0.08),
         -8px -8px 16px rgba(255, 255, 255, 1);
+    
+    /* 控制按钮图标颜色 (白蓝主题下为清透蓝色调) */
+    --rainy-btn-icon-color: #0284c7; 
+    --rainy-btn-icon-active: #38bdf8;
 
     /* 激活态/中心键：果冻蓝 */
     --rainy-btn-accent-bg: linear-gradient(135deg, #38bdf8, #0ea5e9);
@@ -71,13 +76,14 @@ html[data-theme="mono"] {
 
     --rainy-screen-bezel: #ffffff;
     --rainy-screen-bg: linear-gradient(160deg, #fafafa 0%, #efefef 50%, #e5e5e5 100%);
-    --rainy-screen-glow: rgba(255, 255, 255, 0.9);
+    --rainy-screen-glow: rgba(0, 0, 0, 0.12); /* 调整为适合单色的深色边缘微光 */
     --rainy-screen-text: #1f1f1f;
     --rainy-screen-text-bright: #111111;
     --rainy-screen-text-dim: #666666;
     --rainy-screen-accent: #111111;
     --rainy-screen-accent-bright: #333333;
     --rainy-screen-border: rgba(255, 255, 255, 0.8);
+    --rainy-watermark-color: #666666; /* 新增：黑白主题下的水印颜色 */
 
     --rainy-screen-card-bg: rgba(255, 255, 255, 0.65);
     --rainy-screen-card-border: rgba(255, 255, 255, 0.85);
@@ -87,6 +93,10 @@ html[data-theme="mono"] {
     --rainy-btn-shadow:
         8px 8px 16px rgba(0, 0, 0, 0.08),
         -8px -8px 16px rgba(255, 255, 255, 1);
+    
+    /* 黑白主题下的按键颜色 */
+    --rainy-btn-icon-color: #666666;
+    --rainy-btn-icon-active: #111111;
 
     --rainy-btn-accent-bg: linear-gradient(135deg, #2f2f2f, #000000);
     --rainy-btn-accent-border: transparent;
@@ -163,7 +173,7 @@ html[data-theme="mono"] {
 .rainy-fab:active {
     transform: scale(0.92);
     box-shadow:
-        0 4px 12px rgba(14, 165, 233, 0.1),
+        0 4px 12px rgba(14, 165, 233, 0.1)
         inset 0 4px 8px rgba(0, 0, 0, 0.05);
 }
 
@@ -172,9 +182,7 @@ html[data-theme="mono"] {
     height: 44px;
     border-radius: 50%;
     background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     color: white;
     box-shadow:
         0 4px 12px rgba(14, 165, 233, 0.3),
@@ -283,12 +291,13 @@ html[data-theme="mono"] {
     font-size: 8px;
     font-weight: 600;
     letter-spacing: 1.5px;
-    color: #0ea5e9;
-    opacity: 0.18;
+    color: var(--rainy-watermark-color); /* 绑定自适应变量，随主题自动改变颜色 */
+    opacity: 0.25; /* 略微提升不透明度，增加可读性 */
     pointer-events: none;
     z-index: 10;
     font-family: inherit;
     user-select: none;
+    transition: color var(--rainy-t-normal);
 }
 
 /* ─── 内部清透屏幕 ─── */
@@ -297,7 +306,8 @@ html[data-theme="mono"] {
     border-radius: var(--rainy-radius-screen);
     border: 1px solid rgba(255,255,255,0.6);
     display: flex; flex-direction: column; overflow: hidden; position: relative;
-    box-shadow: inset 0 0 30px var(--rainy-screen-glow);
+    box-shadow: inset 0 0 30px var(--rainy-screen-glow); /* 绑定自适应变量 */
+    transition: box-shadow var(--rainy-t-normal);
 }
 .rainy-mp3-screen::after {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 40%;
@@ -342,16 +352,17 @@ html[data-theme="mono"] {
     box-sizing: border-box;
 }
 
-/* 将横向 Tab 按钮通过定位分布在轮盘上 */
+/* 轮盘五个按键的基础设置 */
 .rainy-mp3-tab {
     position: absolute;
     width: 64px; height: 64px;
     background: transparent; border: none; box-shadow: none;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    color: #64748b; font-family: inherit; -webkit-tap-highlight-color: transparent;
+    color: var(--rainy-btn-icon-color); /* 绑定自适应变量 */
+    font-family: inherit; -webkit-tap-highlight-color: transparent;
     cursor: pointer; transition: all var(--rainy-t-fast);
 }
-.rainy-mp3-tab:active { transform: scale(0.9); color: var(--rainy-screen-accent); }
+.rainy-mp3-tab:active { transform: scale(0.9); color: var(--rainy-btn-icon-active); } /* 激活时切换至对应主题的深浅颜色 */
 
 /* 轮盘五个按键的位置映射 (上、左、中、右、下) */
 .rainy-mp3-tab:nth-child(1) { top: 12px; left: 50%; transform: translateX(-50%); }
@@ -410,18 +421,15 @@ html[data-theme="mono"] {
 
 /* 左 — 向左箭头 (Prev) */
 .rainy-mp3-tab:nth-child(2) .rainy-mp3-tab-icon::before {
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M19 12H9m0 0l5-5m-5 5l5 5'/%3E%3C/svg%3E");
-    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M19 12H9m0 0l5-5m-5 5l5 5'/%3E%3C/svg%3E");
-    -webkit-mask-size: 90%;
-    mask-size: 90%;
-    /* 改用 stroke 风格 SVG */
     -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 12H5M5 12l6-6M5 12l6 6'/%3E%3C/svg%3E");
     mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 12H5M5 12l6-6M5 12l6 6'/%3E%3C/svg%3E");
+    -webkit-mask-size: 90%;
+    mask-size: 90%;
 }
 
 /* 中 — Home 图标 (确认键) */
 .rainy-mp3-tab:nth-child(3) .rainy-mp3-tab-icon {
-    overflow: hidden; /* 裁掉溢出的 undefined 文字 */
+    overflow: hidden;
 }
 .rainy-mp3-tab:nth-child(3) .rainy-mp3-tab-icon::before {
     width: 22px;
