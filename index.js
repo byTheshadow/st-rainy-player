@@ -159,21 +159,129 @@
     }
 
     async function subApiGenerate({ ordered_prompts, max_chat_history = 20 }) {
-        const s = getSettings().sub_api;
+              const s = getSettings().sub_api;
         if (!s.url || !s.model) throw new Error('请先在设置中配置副 API');
-        if (typeof SillyTavern === 'undefined' || !SillyTavern.getContext) throw new Error('ST 环境不可用');
 
-        const ctx = SillyTavern.getContext();
         setApiStatus('generating');
+
         try {
-            const result = await ctx.generateRaw({
-                custom_api: { apiurl: s.url, key: s.key, model: s.model, max_tokens: s.max_tokens, temperature: s.temperature },
-                ordered_prompts,
-                max_chat_history,should_stream: false,
-                should_silence: true,
+            // 构建 messages 数组
+            const messages = [];
+
+            // 从 ST 获取上下文信息（角色描述、聊天历史等）
+            let charDescription = '';
+            let charPersonality = '';
+            let chatHistory = [];
+            let worldInfoBefore = '';
+            let worldInfoAfter = '';
+
+            try {
+                if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) {
+                    const ctx = SillyTavern.getContext();
+
+                    // 获取角色信息
+                    if (ctx.characters && ctx.characterId !== undefined) {
+                        const char = ctx.characters[ctx.characterId];
+                        if (char) {
+                            charDescription = char.description || '';
+                            charPersonality = char.personality || '';}
+                    }
+
+                    // 获取聊天历史
+                    if (ctx.chat && Array.isArray(ctx.chat)) {
+                        const recentChat = ctx.chat.slice(-max_chat_history);
+                        chatHistory = recentChat.map(msg => ({
+                            role: msg.is_user ? 'user' : 'assistant',
+                            content: msg.mes || msg.message || '',
+                        })).filter(m => m.content.trim());
+                    }
+                }
+            } catch (e) {
+                console.warn('[RainyPlayer] 获取 ST 上下文失败，将仅使用 prompt:', e);
+            }
+
+            // 按 ordered_prompts 顺序构建 messages
+            for (const item of ordered_prompts) {
+                if (typeof item === 'string') {
+                    // 字符串标识符：引用 ST 上下文数据
+                    switch (item) {
+                        case 'char_description':
+                            if (charDescription) {
+                                messages.push({ role: 'system', content: `[角色描述]\n${charDescription}` });
+                            }
+                            break;
+                        case 'char_personality':
+                            if (charPersonality) {
+                                messages.push({ role: 'system', content: `[角色性格]\n${charPersonality}` });
+                            }
+                            break;
+                        case 'chat_history':
+                            messages.push(...chatHistory);
+                            break;
+                        case 'world_info_before':
+                            if (worldInfoBefore) {
+                                messages.push({ role: 'system', content: worldInfoBefore });
+                            }
+                            break;
+                        case 'world_info_after':
+                            if (worldInfoAfter) {
+                                messages.push({ role: 'system', content: worldInfoAfter });
+                            }
+                            break;
+                        default:
+                            console.warn('[RainyPlayer] 未知的 prompt 标识符:', item);
+                    }
+                } else if (item && typeof item === 'object' && item.role && item.content) {
+                    // 直接的 message 对象
+                    messages.push({ role: item.role, content: item.content });
+                }
+            }
+
+            // 确保至少有一条消息
+            if (messages.length === 0) {
+                messages.push({ role: 'user', content: '请生成内容。' });
+            }
+
+            // 直接 fetch 调用 OpenAI 兼容 API
+            let base = s.url.replace(/\/+$/, '');
+            if (!base.endsWith('/v1')) base += '/v1';
+
+            console.log('[RainyPlayer] 调用副API:', base, '模型:', s.model, '消息数:', messages.length);
+
+            const resp = await fetch(`${base}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${s.key}`,
+                },
+                body: JSON.stringify({
+                    model: s.model,
+                    messages: messages,
+                    max_tokens: s.max_tokens || 2000,
+                    temperature: s.temperature ?? 0.9,
+                    stream: false,
+                }),
             });
+
+            if (!resp.ok) {
+                const errText = await resp.text().catch(() => '');
+                console.error('[RainyPlayer] API 错误响应:', resp.status, errText);
+                throw new Error(`API 错误${resp.status}: ${errText.slice(0, 200)}`);
+            }
+
+            const data = await resp.json();
+
+            // 提取回复内容
+            const reply = data.choices?.[0]?.message?.content;
+            if (!reply) {
+                console.error('[RainyPlayer] API 返回格式异常:', data);
+                throw new Error('API 返回格式异常，无法提取回复');
+            }
+
+            console.log('[RainyPlayer] 生成成功，长度:', reply.length);
             setApiStatus('connected');
-            return result;
+            return reply;
+
         } catch (e) {
             setApiStatus('error');
             throw e;
