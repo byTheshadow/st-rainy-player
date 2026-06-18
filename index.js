@@ -1010,73 +1010,100 @@
             try {
                 if (typeof SillyTavern === 'undefined' || !SillyTavern.getContext) throw new Error('ST 环境不可用');
                 const ctx = SillyTavern.getContext();
-
-                // 步骤1: 用/createwi 创建条目，获取 UID
-                // /createwi file="书名" key="关键词" 内容
-                //需要对参数中的引号做转义
+// 步骤1: 先创建一个空条目，只传key
                 const safeBook = bookName.replace(/"/g, '\\"');
                 const safeKey = keyword.replace(/"/g, '\\"');
 
                 const createResult = await ctx.executeSlashCommandsWithOptions(
-                    `/createwi file="${safeBook}" key="${safeKey}" ${content}`,
+                    `/createwi file="${safeBook}" key="${safeKey}"`,
                     { handleParserErrors: false, handleExecutionErrors: false }
                 );
 
-                const uid = createResult?.pipe;
-                if (!uid || typeof uid !== 'string' || !uid.trim()) {
-                    throw new Error('创建条目失败：未返回 UID');
+                const uid = String(createResult?.pipe ?? '').trim();
+                console.log('[RainyPlayer] 世界书条目已创建, UID:', uid, '类型:', typeof createResult?.pipe);
+
+                if (uid === '' || uid === 'undefined' || uid === 'null') {
+                    throw new Error('创建条目失败：未返回有效 UID');
                 }
 
-                const trimmedUid = uid.trim();
-                console.log('[RainyPlayer] 世界书条目已创建, UID:', trimmedUid);
-                // 步骤2: 设置 depth
-try {
-    await ctx.executeSlashCommandsWithOptions(
-        `/setwifield file="${safeBook}" uid=${trimmedUid} field=depth ${depth}`,
-        { handleParserErrors: false, handleExecutionErrors: false }
-    );
-    console.log('[RainyPlayer] depth 设置成功:', depth);
-} catch (e) {
-    console.warn('[RainyPlayer] setwifield depth 失败, 尝试备用语法:', e);
-    try {
-        await ctx.executeSlashCommandsWithOptions(
-            `/setwi field="depth" file="${safeBook}" uid="${trimmedUid}" ${depth}`,
-            { handleParserErrors: false, handleExecutionErrors: false }
-        );
-    } catch (e2) { console.warn('[RainyPlayer] 备用语法也失败:', e2); }
-}
-
-                // 步骤3: 确保条目启用（disable=false）
+                // 步骤2: 用 /setwifield 逐个设置字段
+                // 设置 content
+                const safeContent = content.replace(/`/g, '\\`');
                 try {
                     await ctx.executeSlashCommandsWithOptions(
-                        `/setwifield file="${safeBook}" uid=${trimmedUid} field=disable false`,
+                        `/setvar key=_rainy_temp ${safeContent}`,
+                        { handleParserErrors: false, handleExecutionErrors: false }
+                    );
+                    await ctx.executeSlashCommandsWithOptions(
+                        `/setwifield file="${safeBook}" uid=${uid} field=content {{getvar::_rainy_temp}}`,
+                        { handleParserErrors: false, handleExecutionErrors: false }
+                    );
+                    console.log('[RainyPlayer] content 设置成功');
+                } catch (e) {
+                    console.warn('[RainyPlayer] 通过变量设置 content 失败, 尝试直接写入:', e);
+                    try {
+                        const escapedContent = content.replace(/\|/g, '\\|').replace(/\{/g, '\\{').replace(/\}/g, '\\}');
+                        await ctx.executeSlashCommandsWithOptions(
+                            `/setwifield file="${safeBook}" uid=${uid} field=content ${escapedContent}`,
+                            { handleParserErrors: false, handleExecutionErrors: false }
+                        );
+                    } catch (e2) { console.error('[RainyPlayer] 直接写入 content 也失败:', e2); }
+                }
+
+                // 设置 depth
+                try {
+                    await ctx.executeSlashCommandsWithOptions(
+                        `/setwifield file="${safeBook}" uid=${uid} field=depth ${depth}`,
+                        { handleParserErrors: false, handleExecutionErrors: false }
+                    );
+                    console.log('[RainyPlayer] depth 设置成功:', depth);
+                } catch (e) { console.warn('[RainyPlayer] 设置 depth 失败:', e); }
+
+                // 设置 position
+                try {
+                    await ctx.executeSlashCommandsWithOptions(
+                        `/setwifield file="${safeBook}" uid=${uid} field=position ${position}`,
+                        { handleParserErrors: false, handleExecutionErrors: false }
+                    );
+                    console.log('[RainyPlayer] position 设置成功:', position);
+                } catch (e) { console.warn('[RainyPlayer] 设置 position 失败:', e); }
+
+                // 步骤3: 确保条目启用 + 设为常驻
+                try {
+                    await ctx.executeSlashCommandsWithOptions(
+                        `/setwifield file="${safeBook}" uid=${uid} field=disable false`,
                         { handleParserErrors: false, handleExecutionErrors: false }
                     );
                 } catch (e) { console.warn('[RainyPlayer] 设置 disable 失败:', e); }
 
+                try {
+                    await ctx.executeSlashCommandsWithOptions(
+                        `/setwifield file="${safeBook}" uid=${uid} field=constant true`,
+                        { handleParserErrors: false, handleExecutionErrors: false }
+                    );
+                    console.log('[RainyPlayer] 已设为常驻条目');
+                } catch (e) { console.warn('[RainyPlayer] 设置 constant 失败:', e); }
+                // 清理临时变量
+                try {
+                    await ctx.executeSlashCommandsWithOptions(
+                        `/setvar key=_rainy_temp`,
+                        { handleParserErrors: false, handleExecutionErrors: false }
+                    );
+                } catch (e) { /* 忽略 */ }
 
-                // 记住上次使用的世界书
-                updateSettings(s => {
-                    if (!s.worldbook) s.worldbook = {};
-                    s.worldbook.last_used_book = bookName;
-                    return s;
-                });
-
-                wbOverlay.style.display = 'none';
-                showToast('✅ 已成功写入世界书！', 'success');
-
-            } catch (e) {
+            } catch (e) {                                         // ← 补在这里
                 console.error('[RainyPlayer] 写入世界书失败:', e);
-                showToast('写入失败: ' + e.message, 'error');// Fallback: 复制到剪贴板
+                showToast('写入失败: ' + e.message, 'error');
                 try {
                     await navigator.clipboard.writeText(content);
                     showToast('已复制内容到剪贴板，请手动粘贴到世界书', 'warning', 5000);
-                } catch { /*剪贴板也失败了就算了 */ }
+                } catch { }
             } finally {
                 confirmBtn.disabled = false;
                 confirmBtn.textContent = '✅ 确认写入';
             }
-        });
+        });   // addEventListener 闭合
+                
 
     }
 
