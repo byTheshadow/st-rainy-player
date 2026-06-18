@@ -13,11 +13,11 @@
 const PLUGIN_NAME = 'rainy-player';
 
 const CHANNELS = [
-    { id: 'theater',  icon: iconCircleUp,     label: '剧场' },
-    { id: 'radio',    icon: iconCircleLeft,   label: '电台' },
-    { id: 'summary',  icon: iconCircleCenter, label: '摘要' },
-    { id: 'gallery',  icon: iconCircleRight,  label: '画廊' },
-    { id: 'settings', icon: iconCircleDown,   label: '设置' },
+    { id: 'theater',   label: '剧场' },
+    { id: 'radio',     label: '电台' },
+    { id: 'summary',  label: '摘要' },
+    { id: 'gallery',   label: '画廊' },
+    { id: 'settings',  label: '设置' },
 ];
 
 
