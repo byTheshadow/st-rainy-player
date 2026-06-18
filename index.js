@@ -10,40 +10,6 @@
     // 📦SECTION 1: 常量& 配置
     // ═══════════════════════════════════════
 
-  const iconCircleUp = `
-<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
-  <path d="M12 16V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M8.8 11.2L12 8l3.2 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
-
-const iconCircleDown = `
-<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
-  <path d="M12 8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M8.8 12.8L12 16l3.2-3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
-
-const iconCircleLeft = `
-<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
-  <path d="M16 12H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M11.2 8.8L8 12l3.2 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
-
-const iconCircleRight = `
-<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
-  <path d="M8 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M12.8 8.8L16 12l-3.2 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
-
-const iconCircleCenter = `
-<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
-  <circle cx="12" cy="12" r="3.2" fill="currentColor"/>
-</svg>`;
-
 const PLUGIN_NAME = 'rainy-player';
 
 const CHANNELS = [
@@ -84,9 +50,21 @@ const CHANNELS = [
             prefix: 'masterpiece, best quality',},
         theater: {
             types: [
-                { id: 'daily', name: '日常', prompt: '基于当前对话的角色和场景，生成一段轻松有趣的日常番外小故事。保持角色性格一致，字数300-500字。' },
-                { id: 'romantic', name: '甜蜜', prompt: '基于当前对话的角色和场景，生成一段温馨甜蜜的番外小故事。保持角色性格一致，字数300-500字。' },
-                { id: 'adventure', name: '冒险', prompt: '基于当前对话的角色和场景，生成一段紧张刺激的冒险番外小故事。保持角色性格一致，字数300-500字。' },
+                
+    { id: 'backstage', name: '后台茶水间', prompt: '生成一个非正典的短场景，让多个NPC讨论关于角色和用户的最新主线剧情。用于提供外部视角、展现流言蜚语，并丰富世界观。即时反应：对话必须是针对最新发生的主线事件的直接反应，并展现出NPC们（如敬畏、恐惧、怀疑、困惑等）的不同立场。人设一致：参与对话的每个NPC，其语气和观点都必须严格符合其既定性格。篇幅控制：长度约为100-200字。' },
+    { id: 'improv_stage', name: '即兴舞台', prompt: '基于当前主线场景的情感核心（如“紧张对峙”、“笨拙关怀”），创作一个充满创意的、非正典的AU（平行宇宙）短剧。主题再创：必须提炼当前场景的核心主题，并构思一个全新的、意想不到的平行场景来映射该主题。人设保留：无论新场景多么离奇，角色的核心性格必须被完整保留。戏剧性来源于其真实性格与荒诞情境的碰撞。' },
+    { id: 'animation_au', name: '动画世界', prompt: '随机生成一个非正典的AU穿越短篇，将角色和用户置于一个经典的动画电影世界（如迪士尼、皮克斯、梦工厂等）的背景中进行互动。' },
+    { id: 'deep_au', name: '深度AU长篇', prompt: '生成一个随机的、深度展开的、字数不少于1000字的AU（平行宇宙）短篇故事。火花风暴：第一重从丰富题材库（如赛博朋克、哨兵向导、规则怪谈、末日生存、无限流等）中随机选择一个核心题材；第二重根据选定题材生成具体的开场情境或核心冲突；第三重构思一个独特的文字排版美学和纯文本格式主题。深度叙事：必须包含完整的微型叙事结构（开端->发展->高潮->结局），并深入探索角色和用户在该AU背景下的情感关系和内心挣扎。OOC禁令：无论AU世界多么光怪陆离，角色和用户的核心性格、思维模式和内在驱动力必须保持一致。' },
+    { id: 'encore_channel', name: '安可频道', prompt: '随机选择一种独特的、非传统的剧场形式，生成一个充满创意的非正典短篇。核心原则：从各种电视频道、综艺、纪录片、访谈、电台（如国家地理、焦点访谈、动物世界、深夜电台等）中随机选择一种。剧场的内容可以与刚刚结束的正典剧情的核心事件、情绪或主题相关联，也可以完全是AU不与正典剧情相关。形式即内容：必须严格遵循所选频道的独特文字排版格式和节目“人设”来进行叙事。' },
+    { id: 'picture_book', name: '治愈绘本', prompt: '将当前复杂的剧情、纠葛的关系或沉重的情感，重构为一本温暖、治愈或带有寓言性质的儿童绘本。童真降维：强制将角色和用户转化为动物、植物或具象化的物体；语言必须极度简单、短促、富有韵律感，模仿睡前故事；将现实中的复杂矛盾转化为童话式困境。绘本结构：必须包含3-5个“页面”，每一页先通过[画面：...]或emoji排版描述视觉构图，然后是对应的绘本配文。情感内核：结局必须是温暖的、和解的，或者如《小王子》般温柔静谧的遗憾。' },
+    { id: 'astrology_card', name: '星象运势', prompt: '生成一份基于当前角色星座的、带有神秘学美感的运势卡片，并附加角色的即时反应。星象计算：确认角色星座（若未知则基于性格反推），随机生成今日星象相位（如水星逆行等）。运势解读：包含“宜”（2个具体行动）、“忌”（2个具体行动），以及一句晦涩但似乎在影射当前剧情的预言作为运势短评。角色反馈：描写角色看到这份运势时的反应（是迷信照做、不屑一顾还是若有所思等），反应必须严格符合其人设。' },
+    { id: 'personality_test', name: '人格测试', prompt: '随机生成一份人格或身份测试问卷，模拟角色的填写过程与反应。试卷选择：随机选择一种测试（如MBTI、霍格沃兹分院、DND阵营、依恋人格等）。填写过程：生成3-4道该测试的典型题目，并描写角色的作答过程（如认真勾选或在旁边的毒舌吐槽）。结果与锐评：展示最终测试结果，并重点描写角色对结果或某道题目的最终评价（是嗤之以鼻、被戳中痛脚还是觉得有点准），互动必须生动且符合角色性格。' },
+    { id: 'social_media_pov', name: '路人视角', prompt: '生成一条由路人或NPC发布的社交媒体动态，从第三方视角侧写刚才的主线剧情。视角选择：随机（如路人随手拍、工作人员群聊、店员树洞等）。创作核心：动态内容必须精准反映刚才角色与用户互动的余波、张力或特定瞬间；需包含一段虚拟照片的纯文本构图描述（如模糊的背影、昏暗灯光下的重叠人影等）；模拟真实的互动数据（点赞、转发数）以及2-3条具有代表性的路人评论（惊叹、八卦或揣测）。角色留存：若情境允许，简短描写角色无意间看到此动态时的一个微小反应（如指尖停顿、冷漠关掉屏幕等）。' },
+    { id: 'soul_interview', name: '灵魂拷问', prompt: '生成一段非正典的“灵魂拷问”采访小剧场。场景设定：角色突然置身于一个神秘的采访间，面前的虚拟采访者会针对刚刚主线剧情中角色对用户的真实想法，提出3个非常犀利、甚至有些直白八卦的问题。互动刻画：必须生动描写角色听到问题时的微表情、肢体语言以及最终的回答（是坦诚、傲娇逃避、还是恼怒拍桌）。回答与反应必须绝对符合角色的既定人设与当下的心理隐秘状态。' },
+    { id: 'item_drop', name: '掉落图鉴', prompt: '将刚才主线剧情的情感核心或某个细节，转化为一个RPG游戏中的“掉落物品”图鉴。物品名称：基于当前剧情提取（如“未能说出口的抱歉”、“被揉乱的衣角”）。物品稀有度：随机分配（普通到传说）。物品描述：用一段充满游戏色彩又带点细腻情感的文字，描述此物品的来历和触感。装备效果：设定奇妙的加成（如“当用户佩戴时，角色的理智值下降10%”）。评语：最后附带一句角色的专属吐槽或内心独白作为图鉴底部的收藏家寄语。' },
+    { id: 'blooper_reel', name: '片场NG花絮', prompt: '打破第四面墙，将刚才的主线剧情当作是在拍摄一部剧集，生成一段非正典的“片场NG花絮”。情境设定：刚才剧情中最紧张、最感人或最暧昧的那个瞬间，因为某个意外（如角色嘴瓢忘词、道具突然掉落、用户忍不住笑场或场外噪音等）而突然NG导演喊卡。脱戏反应：生动描写角色瞬间从剧情状态中抽离出来的真实反应（是无奈扶额、被逗笑、还是认真地要求保一条），展现角色和用户在“演员”身份下轻松有趣的互动氛围。' },
+    { id: 'dream_diary', name: '梦境解码', prompt: '基于刚才的主线事件生成一段荒诞且隐喻丰富的“角色梦境记录”。情境设定：事件结束后，角色进入了睡眠，做了一个光怪陆离的梦。梦境内容：梦里必须出现用户，但用户的形象或所处的环境发生了扭曲的超现实变化（例如两人在失重的海洋里喝茶，或用户变成了难以触碰的玻璃人）。情感投射：梦境必须精准投射出角色在刚才剧情中未能表达出的潜意识（如占有欲、恐惧、愧疚或极度的渴望）。结尾：以角色突然惊醒，看着现实环境的怔愣与心有余悸作为收尾。' }
+
             ],
         },
         summary: {
