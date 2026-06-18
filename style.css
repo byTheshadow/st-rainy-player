@@ -378,13 +378,14 @@ html[data-theme="mono"] {
 
 /* 隐藏 .rainy-mp3-tab-icon 内的文字内容，改用伪元素注入图标 */
 .rainy-mp3-tab .rainy-mp3-tab-icon {
-    font-size: 0; /* 隐藏原有文字/emoji */
+    color: transparent !important;
     display: flex;
     align-items: center;
     justify-content: center;
     width: 24px;
     height: 24px;
     position: relative;
+    font-size: 18px;
 }
 
 .rainy-mp3-tab .rainy-mp3-tab-icon::before {
@@ -419,6 +420,9 @@ html[data-theme="mono"] {
 }
 
 /* 中 — Home 图标 (确认键) */
+.rainy-mp3-tab:nth-child(3) .rainy-mp3-tab-icon {
+    overflow: hidden; /* 裁掉溢出的 undefined 文字 */
+}
 .rainy-mp3-tab:nth-child(3) .rainy-mp3-tab-icon::before {
     width: 22px;
     height: 22px;
