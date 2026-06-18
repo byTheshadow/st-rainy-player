@@ -829,22 +829,29 @@ function refreshTheaterHistory(el) {
                     list.unshift({ id: uuid(), content: result, created_at: Date.now() });
                     return list.slice(0, 20);
                 });
+refreshRadioHistory(el);
+
             } catch (e) {
                 newsEl.innerHTML = `<div class="rainy-scr-empty"><div class="rainy-scr-empty-text" style="color:#ef4444;">接收失败: ${e.message}</div></div>`;
                 marquee.textContent = '▸▸▸ SIGNAL LOST ▸▸▸';
                 showToast('电台接收失败', 'error');
             } finally { btn.disabled = false; }
         });
+        refreshRadioHistory(el);
+
     }
 
-    function parseRadioNews(text) {
-        const regex = /【(.+?)】([\s\S]*?)(?=【|$)/g;
-        const items = [];
-        let m;
-        while ((m = regex.exec(text)) !== null) items.push({ title: m[1].trim(), body: m[2].trim() });
-        if (!items.length) items.push({ title: '广播速报', body: text });
-        return items;
+   function parseRadioNews(text) {
+    const regex = /【(.+?)】([\s\S]*?)(?=【|$)/g;
+    const items = [];
+    let m;
+    while ((m = regex.exec(text)) !== null) {
+        items.push({ title: m[1].trim(), body: m[2].trim() });
     }
+    if (!items.length) items.push({ title: '广播速报', body: text });
+    return items;
+}
+
 function refreshRadioHistory(el) {
     const box = el.querySelector('#rainy-radio-history');
     const history = storage.get('radio_history', []);
@@ -890,8 +897,6 @@ function refreshRadioHistory(el) {
             refreshRadioHistory(el);
         });
     });
-    refreshRadioHistory(el);
-
 }
 
     // ═══════════════════════════════════════
