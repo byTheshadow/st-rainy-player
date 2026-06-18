@@ -1010,12 +1010,13 @@
             try {
                 if (typeof SillyTavern === 'undefined' || !SillyTavern.getContext) throw new Error('ST 环境不可用');
                 const ctx = SillyTavern.getContext();
-// 步骤1: 先创建一个空条目，只传key
+                // 步骤1: 创建条目
                 const safeBook = bookName.replace(/"/g, '\\"');
-                const safeKey = keyword.replace(/"/g, '\\"');
+                // key 不能加引号！空格用逗号替代（ST世界书多关键词用逗号分隔）
+                const safeKey = keyword.replace(/"/g, '').replace(/\s+/g, ',');
 
                 const createResult = await ctx.executeSlashCommandsWithOptions(
-                    `/createwi file="${safeBook}" key="${safeKey}"`,
+                    `/createwi file="${safeBook}" key=${safeKey}`,
                     { handleParserErrors: false, handleExecutionErrors: false }
                 );
 
