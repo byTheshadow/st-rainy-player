@@ -1029,40 +1029,22 @@
 
                 const trimmedUid = uid.trim();
                 console.log('[RainyPlayer] 世界书条目已创建, UID:', trimmedUid);
-
-                // 步骤2: 用 /setwi field设置 depth 和 position
-                // /setwi field=depth file="书名" uid=UID 值
-                                // 步骤2: 用 /setwifield 设置 depth 和 position
-                // 语法: /setwifield file="书名" uid=UID field=字段名 值
-                     await ctx.executeSlashCommandsWithOptions(
-                        `/setwifield file="${safeBook}" uid=${trimmedUid} field=depth ${depth}`,
-                        { handleParserErrors: false, handleExecutionErrors: false }
-                    );console.log('[RainyPlayer] depth 设置成功:', depth);
-                } catch (e) {
-                    console.warn('[RainyPlayer] setwifield depth 失败, 尝试备用语法:', e);
-                    // 备用语法: /getsetwifield 或直接在 createwi 时就完成
-                    try {
-                        await ctx.executeSlashCommandsWithOptions(
-                            `/setwi field="depth" file="${safeBook}" uid="${trimmedUid}" ${depth}`,
-                            { handleParserErrors: false, handleExecutionErrors: false }
-                        );} catch (e2) { console.warn('[RainyPlayer] 备用语法也失败:', e2); }
-                }
-
-                try {
-                    await ctx.executeSlashCommandsWithOptions(
-                        `/setwifield file="${safeBook}" uid=${trimmedUid} field=position ${position}`,
-                        { handleParserErrors: false, handleExecutionErrors: false }
-                    );
-                    console.log('[RainyPlayer] position 设置成功:', position);
-                } catch (e) {
-                    console.warn('[RainyPlayer] setwifield position 失败, 尝试备用语法:', e);
-                    try {
-                        await ctx.executeSlashCommandsWithOptions(
-                            `/setwi field="position" file="${safeBook}" uid="${trimmedUid}" ${position}`,
-                            { handleParserErrors: false, handleExecutionErrors: false }
-                        );
-                    } catch (e2) { console.warn('[RainyPlayer] 备用语法也失败:', e2); }
-                }
+                // 步骤2: 设置 depth
+try {
+    await ctx.executeSlashCommandsWithOptions(
+        `/setwifield file="${safeBook}" uid=${trimmedUid} field=depth ${depth}`,
+        { handleParserErrors: false, handleExecutionErrors: false }
+    );
+    console.log('[RainyPlayer] depth 设置成功:', depth);
+} catch (e) {
+    console.warn('[RainyPlayer] setwifield depth 失败, 尝试备用语法:', e);
+    try {
+        await ctx.executeSlashCommandsWithOptions(
+            `/setwi field="depth" file="${safeBook}" uid="${trimmedUid}" ${depth}`,
+            { handleParserErrors: false, handleExecutionErrors: false }
+        );
+    } catch (e2) { console.warn('[RainyPlayer] 备用语法也失败:', e2); }
+}
 
                 // 步骤3: 确保条目启用（disable=false）
                 try {
