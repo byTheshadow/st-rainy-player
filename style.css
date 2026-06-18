@@ -4,17 +4,63 @@
 
 /* ─── CSS Variables ─── */
 :root {
-    /* 现代柔和机身：纯白磨砂质感 */
+    /* 默认白蓝主题 */
     --rainy-body-bg: linear-gradient(145deg, #ffffff 0%, #f4f7fb 100%);
     --rainy-body-border: rgba(255, 255, 255, 0.8);
-    --rainy-body-shadow: 
-        0 24px 48px rgba(14, 165, 233, 0.12), 
+    --rainy-body-shadow:
+        0 24px 48px rgba(14, 165, 233, 0.12),
         0 8px 16px rgba(14, 165, 233, 0.06),
         inset 0 2px 4px rgba(255, 255, 255, 1);
-/* ═══════════════════════════════════════
-   黑白主题
-   通过 <html data-theme="mono"> 启用
-   ═══════════════════════════════════════ */
+
+    /* 屏幕区域：天空蓝/冰川透亮 */
+    --rainy-screen-bezel: #ffffff;
+    --rainy-screen-bg: linear-gradient(160deg, #f0f9ff 0%, #e0f2fe 50%, #bae6fd 100%);
+    --rainy-screen-glow: rgba(255, 255, 255, 0.8);
+    --rainy-screen-text: #0284c7;
+    --rainy-screen-text-bright: #0369a1;
+    --rainy-screen-text-dim: #38bdf8;
+    --rainy-screen-accent: #0ea5e9;
+    --rainy-screen-accent-bright: #38bdf8;
+    --rainy-screen-border: rgba(255, 255, 255, 0.8);
+
+    /* 玻璃态卡片与控件 */
+    --rainy-screen-card-bg: rgba(255, 255, 255, 0.4);
+    --rainy-screen-card-border: rgba(255, 255, 255, 0.9);
+    --rainy-screen-input-bg: rgba(255, 255, 255, 0.8);
+    --rainy-screen-scrollbar: rgba(14, 165, 233, 0.3);
+
+    /* 现代柔和按键 (Neumorphism 轮盘底座) */
+    --rainy-btn-shadow:
+        8px 8px 16px rgba(14, 165, 233, 0.08),
+        -8px -8px 16px rgba(255, 255, 255, 1);
+
+    /* 激活态/中心键：果冻蓝 */
+    --rainy-btn-accent-bg: linear-gradient(135deg, #38bdf8, #0ea5e9);
+    --rainy-btn-accent-border: transparent;
+    --rainy-btn-accent-shadow:
+        0 8px 16px rgba(14, 165, 233, 0.25),
+        inset 0 2px 4px rgba(255,255,255,0.4);
+
+    /* 尺寸调整为 iPod 比例 */
+    --rainy-panel-width: 360px;
+    --rainy-panel-height: 680px;
+    --rainy-radius-body: 32px;
+    --rainy-radius-screen: 16px;
+    --rainy-radius-btn: 16px;
+    --rainy-fab-size: 64px;
+
+    /* 过渡 */
+    --rainy-t-fast: 0.15s ease;
+    --rainy-t-normal: 0.25s ease;
+    --rainy-t-slow: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* z-index */
+    --rainy-z-fab: 9990;
+    --rainy-z-panel: 9991;
+    --rainy-z-toast: 9995;
+}
+
+/* 黑白主题：必须放在 :root 外面 */
 html[data-theme="mono"] {
     --rainy-body-bg: linear-gradient(145deg, #f8f8f8 0%, #e9e9e9 100%);
     --rainy-body-border: rgba(255, 255, 255, 0.8);
@@ -47,54 +93,6 @@ html[data-theme="mono"] {
     --rainy-btn-accent-shadow:
         0 8px 16px rgba(0, 0, 0, 0.22),
         inset 0 2px 4px rgba(255,255,255,0.18);
-}
-
-    /* 屏幕区域：天空蓝/冰川透亮 */
-    --rainy-screen-bezel: #ffffff; 
-    --rainy-screen-bg: linear-gradient(160deg, #f0f9ff 0%, #e0f2fe 50%, #bae6fd 100%);
-    --rainy-screen-glow: rgba(255, 255, 255, 0.8);
-    --rainy-screen-text: #0284c7; 
-    --rainy-screen-text-bright: #0369a1;
-    --rainy-screen-text-dim: #38bdf8;
-    --rainy-screen-accent: #0ea5e9;
-    --rainy-screen-accent-bright: #38bdf8;
-    --rainy-screen-border: rgba(255, 255, 255, 0.8);
-    
-    /* 玻璃态卡片与控件 */
-    --rainy-screen-card-bg: rgba(255, 255, 255, 0.4);
-    --rainy-screen-card-border: rgba(255, 255, 255, 0.9);
-    --rainy-screen-input-bg: rgba(255, 255, 255, 0.8);
-    --rainy-screen-scrollbar: rgba(14, 165, 233, 0.3);
-
-    /* 现代柔和按键 (Neumorphism 轮盘底座) */
-    --rainy-btn-shadow: 
-        8px 8px 16px rgba(14, 165, 233, 0.08), 
-        -8px -8px 16px rgba(255, 255, 255, 1);
-    
-    /* 激活态/中心键：果冻蓝 */
-    --rainy-btn-accent-bg: linear-gradient(135deg, #38bdf8, #0ea5e9);
-    --rainy-btn-accent-border: transparent;
-    --rainy-btn-accent-shadow: 
-        0 8px 16px rgba(14, 165, 233, 0.25),
-        inset 0 2px 4px rgba(255,255,255,0.4);
-
-    /* 尺寸调整为 iPod 比例 */
-    --rainy-panel-width: 360px;
-    --rainy-panel-height: 680px;
-    --rainy-radius-body: 32px;
-    --rainy-radius-screen: 16px;
-    --rainy-radius-btn: 16px;
-    --rainy-fab-size: 64px;
-
-    /* 过渡 */
-    --rainy-t-fast: 0.15s ease;
-    --rainy-t-normal: 0.25s ease;
-    --rainy-t-slow: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-
-    /* z-index */
-    --rainy-z-fab: 9990;
-    --rainy-z-panel: 9991;
-    --rainy-z-toast: 9995;
 }
 
 /* ═══════════════════════════════════════
@@ -132,7 +130,7 @@ html[data-theme="mono"] {
    ═══════════════════════════════════════ */
 .rainy-fab {
     position: fixed;
-    bottom: 30px; 
+    bottom: 30px;
     right: 30px;
     width: var(--rainy-fab-size);
     height: var(--rainy-fab-size);
@@ -141,59 +139,59 @@ html[data-theme="mono"] {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.9);
-    box-shadow: 
-        0 8px 24px rgba(14, 165, 233, 0.15), 
+    box-shadow:
+        0 8px 24px rgba(14, 165, 233, 0.15),
         inset 0 0 0 1px rgba(255, 255, 255, 0.5);
     cursor: pointer;
     z-index: var(--rainy-z-fab);
-    display: flex; 
-    align-items: center; 
+    display: flex;
+    align-items: center;
     justify-content: center;
     transition: transform var(--rainy-t-slow), box-shadow var(--rainy-t-normal);
-    user-select: none; 
-    -webkit-user-select: none; 
+    user-select: none;
+    -webkit-user-select: none;
     touch-action: none;
 }
 
 .rainy-fab:hover {
     transform: scale(1.08) translateY(-4px);
-    box-shadow: 
-        0 12px 32px rgba(14, 165, 233, 0.25), 
+    box-shadow:
+        0 12px 32px rgba(14, 165, 233, 0.25),
         inset 0 0 0 1px rgba(255, 255, 255, 0.8);
 }
 
 .rainy-fab:active {
     transform: scale(0.92);
-    box-shadow: 
-        0 4px 12px rgba(14, 165, 233, 0.1), 
+    box-shadow:
+        0 4px 12px rgba(14, 165, 233, 0.1),
         inset 0 4px 8px rgba(0, 0, 0, 0.05);
 }
 
 .rainy-fab-inner {
-    width: 44px; 
+    width: 44px;
     height: 44px;
     border-radius: 50%;
     background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
-    display: flex; 
-    align-items: center; 
+    display: flex;
+    align-items: center;
     justify-content: center;
     color: white;
-    box-shadow: 
+    box-shadow:
         0 4px 12px rgba(14, 165, 233, 0.3),
         inset 0 2px 4px rgba(255, 255, 255, 0.5),
         inset 0 -2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.rainy-fab-inner svg { 
-    width: 20px; 
-    height: 20px; 
-    fill: #ffffff; 
+.rainy-fab-inner svg {
+    width: 20px;
+    height: 20px;
+    fill: #ffffff;
     filter: drop-shadow(0 2px 2px rgba(0,0,0,0.15));
 }
 
-.rainy-fab.is-dragging { 
-    transition: none; 
-    cursor: grabbing; 
+.rainy-fab.is-dragging {
+    transition: none;
+    cursor: grabbing;
 }
 
 /* ═══════════════════════════════════════
@@ -267,8 +265,8 @@ html[data-theme="mono"] {
     margin: 0 24px; padding: 12px;
     background: var(--rainy-screen-bezel);
     border-radius: 24px;
-    box-shadow: 
-        inset 4px 4px 10px rgba(148, 163, 184, 0.15), 
+    box-shadow:
+        inset 4px 4px 10px rgba(148, 163, 184, 0.15),
         inset -4px -4px 10px rgba(255, 255, 255, 1);
     height: 270px;
     display: flex; flex-direction: column; overflow: hidden; position: relative;
@@ -278,7 +276,7 @@ html[data-theme="mono"] {
 /* ─── 内部清透屏幕 ─── */
 .rainy-mp3-screen {
     flex: 1; background: var(--rainy-screen-bg);
-    border-radius: var(--rainy-radius-screen); 
+    border-radius: var(--rainy-radius-screen);
     border: 1px solid rgba(255,255,255,0.6);
     display: flex; flex-direction: column; overflow: hidden; position: relative;
     box-shadow: inset 0 0 30px var(--rainy-screen-glow);
@@ -312,11 +310,11 @@ html[data-theme="mono"] {
 .rainy-app-page.is-active { display: block; }
 
 /* ─── 底部控制区：纯白拟态星钻轮盘 (Click Wheel) ─── */
-.rainy-mp3-controls { 
+.rainy-mp3-controls {
     flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px; flex-shrink: 0;
 }
 
-.rainy-mp3-tabs { 
+.rainy-mp3-tabs {
     position: relative;
     width: 250px; height: 250px;
     border-radius: 50%;
@@ -338,10 +336,10 @@ html[data-theme="mono"] {
 .rainy-mp3-tab:active { transform: scale(0.9); color: var(--rainy-screen-accent); }
 
 /* 轮盘五个按键的位置映射 (上、左、中、右、下) */
-.rainy-mp3-tab:nth-child(1) { top: 12px; left: 50%; transform: translateX(-50%); } /* Menu / Top */
-.rainy-mp3-tab:nth-child(2) { left: 12px; top: 50%; transform: translateY(-50%); } /* Prev / Left */
-.rainy-mp3-tab:nth-child(4) { right: 12px; top: 50%; transform: translateY(-50%); } /* Next / Right */
-.rainy-mp3-tab:nth-child(5) { bottom: 12px; left: 50%; transform: translateX(-50%); } /* Play / Bottom */
+.rainy-mp3-tab:nth-child(1) { top: 12px; left: 50%; transform: translateX(-50%); }
+.rainy-mp3-tab:nth-child(2) { left: 12px; top: 50%; transform: translateY(-50%); }
+.rainy-mp3-tab:nth-child(4) { right: 12px; top: 50%; transform: translateY(-50%); }
+.rainy-mp3-tab:nth-child(5) { bottom: 12px; left: 50%; transform: translateX(-50%); }
 
 /* 中心确认按钮 */
 .rainy-mp3-tab:nth-child(3) {
@@ -352,7 +350,7 @@ html[data-theme="mono"] {
     color: white; z-index: 3;
 }
 .rainy-mp3-tab:nth-child(3) .rainy-mp3-tab-icon { font-size: 22px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1)); }
-.rainy-mp3-tab:nth-child(3) .rainy-mp3-tab-label { display: none; } /* 隐藏中心确认按钮的文本 */
+.rainy-mp3-tab:nth-child(3) .rainy-mp3-tab-label { display: none; }
 .rainy-mp3-tab:nth-child(3):active { transform: translate(-50%, -50%) scale(0.95); }
 
 .rainy-mp3-tab-icon { font-size: 18px; line-height: 1; }
@@ -360,7 +358,7 @@ html[data-theme="mono"] {
 
 /* 底部信息栏 */
 .rainy-mp3-statusbar {
-    display: none; /* 在现代轮盘布局中隐藏，防止遮挡 */
+    display: none;
 }
 
 /* ═══════════════════════════════════════
@@ -404,38 +402,32 @@ html[data-theme="mono"] {
 .rainy-scr-card.is-active::after {
     opacity: 1; color: white;
 }
+
 .rainy-scr-input,
 .rainy-scr-textarea,
 .rainy-scr-select {
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid var(--rainy-screen-card-border, rgba(255,255,255,0.85));
-    background: var(--rainy-screen-input-bg, rgba(255,255,255,0.8));
-    color: var(--rainy-screen-text);
-    border-radius: 10px;
-    padding: 8px 10px;
+    border: 1px solid var(--rainy-screen-card-border);
+    background: var(--rainy-screen-input-bg);
+    color: var(--rainy-screen-text-bright);
+    border-radius: 8px;
+    padding: 8px 12px;
     font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
     outline: none;
+    transition: all var(--rainy-t-fast);
 }
 
 .rainy-scr-input:focus,
 .rainy-scr-textarea:focus,
 .rainy-scr-select:focus {
     border-color: var(--rainy-screen-accent);
-    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
-}
-
-
-.rainy-scr-input, .rainy-scr-select, .rainy-scr-textarea {
-    width: 100%; padding: 8px 12px;
-    border: 1px solid var(--rainy-screen-card-border); border-radius: 8px;
-    background: var(--rainy-screen-input-bg); color: var(--rainy-screen-text-bright);
-    font-size: 11px; font-weight: 500; transition: all var(--rainy-t-fast); box-sizing: border-box;
-}
-.rainy-scr-input:focus, .rainy-scr-select:focus, .rainy-scr-textarea:focus {
-    outline: none; border-color: var(--rainy-screen-accent); background: #ffffff;
+    background: #ffffff;
     box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
 }
+
 .rainy-scr-input::placeholder, .rainy-scr-textarea::placeholder { color: var(--rainy-screen-text-dim); }
 .rainy-scr-textarea { resize: vertical; min-height: 50px; }
 .rainy-scr-select option { background: #ffffff; color: var(--rainy-screen-text-bright); }
@@ -454,7 +446,7 @@ html[data-theme="mono"] {
 
 .rainy-scr-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 16px; color: var(--rainy-screen-text-dim); text-align: center; }
 .rainy-scr-empty-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.7; }
-.rainy-scr-empty-text { font-size: 11px; line-height: 1.6; font-weight: 500;}
+.rainy-scr-empty-text { font-size: 11px; line-height: 1.6; font-weight: 500; }
 
 .rainy-scr-loading { display: flex; align-items: center; justify-content: center; padding: 20px; gap: 6px; }
 .rainy-scr-loading-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rainy-screen-accent); animation: rainy-dot-bounce 1.4s ease-in-out infinite; }
@@ -463,7 +455,7 @@ html[data-theme="mono"] {
 @keyframes rainy-dot-bounce { 0%, 80%, 100% { transform: scale(0.5); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
 
 .rainy-scr-row { display: flex; gap: 8px; align-items: flex-end; }
-.rainy-scr-row > .rainy-scr-field { flex: 1; margin-bottom: 0;}
+.rainy-scr-row > .rainy-scr-field { flex: 1; margin-bottom: 0; }
 .rainy-scr-field { margin-bottom: 10px; }
 
 .rainy-scr-slider-row { display: flex; align-items: center; gap: 10px; }
@@ -626,9 +618,9 @@ html[data-theme="mono"] {
     border-top: 1px solid rgba(255, 255, 255, 0.8);
 }
 
-/*═══════════════════════════════════════
-  Markdown 渲染样式
-  ═══════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   Markdown 渲染样式
+   ═══════════════════════════════════════ */
 .rainy-md-p { margin: 0 0 6px; line-height: 1.7; }
 .rainy-md-p:last-child { margin-bottom: 0; }
 
@@ -668,57 +660,15 @@ html[data-theme="mono"] {
    响应式 · 手机端（≤768px）
    ═══════════════════════════════════════ */
 @media (max-width: 768px) {
-    :root { 
-        --rainy-fab-size: 56px; 
+    :root {
+        --rainy-fab-size: 56px;
     }
-    
+
     .rainy-panel {
         width: 100vw;
         height: 100dvh;
         bottom: 0; right: 0; left: 0; top: 0;
         border-radius: 0; box-shadow: none;
-    }
-    
-    .rainy-mp3-tab-label { display: none; }
-    .rainy-mp3-tab { width: 50px; height: 50px; }
-    .rainy-mp3-tab-icon { font-size: 20px; }
-    
-    .rainy-mp3-close { min-width: 44px; min-height: 44px; font-size: 20px; }
-    
-    .rainy-toast-container { bottom: 90px; left: 16px; right: 16px; transform: none; }
-    .rainy-toast { max-width: 100%; }
-    
-    .rainy-wb-panel { width: 96%; max-height: 92%; }
-    .rainy-wb-panel-close { min-width: 44px; min-height: 44px; }
-}
-
-.rainy-mini-icon-btn {
-    border: none;
-    background: rgba(255, 255, 255, 0.7);
-    color: var(--rainy-screen-text);
-    border-radius: 8px;
-    padding: 4px 6px;
-    font-size: 10px;
-    cursor: pointer;
-    box-shadow: var(--rainy-btn-shadow);
-}
-
-.rainy-mini-icon-btn:active {
-    box-shadow: inset 2px 2px 5px rgba(14, 165, 233, 0.1);
-    transform: translateY(1px);
-}
-
-.rainy-scr-card.is-starred {
-    border: 1px solid rgba(14, 165, 233, 0.25);
-    background: rgba(255, 255, 255, 0.6);
-}
-@media (max-width: 768px) {
-    .rainy-panel {
-        width: 100vw;
-        height: 100dvh;
-        right: 0;
-        bottom: 0;
-        border-radius: 0;
     }
 
     .rainy-mp3-screen-wrap {
@@ -750,7 +700,39 @@ html[data-theme="mono"] {
         height: 76px;
     }
 
+    .rainy-mp3-tab-label { display: none; }
+    .rainy-mp3-tab-icon { font-size: 20px; }
+
+    .rainy-mp3-close { min-width: 44px; min-height: 44px; font-size: 20px; }
+
     .rainy-screen-content {
         padding: 8px;
     }
+
+    .rainy-toast-container { bottom: 90px; left: 16px; right: 16px; transform: none; }
+    .rainy-toast { max-width: 100%; }
+
+    .rainy-wb-panel { width: 96%; max-height: 92%; }
+    .rainy-wb-panel-close { min-width: 44px; min-height: 44px; }
+}
+
+.rainy-mini-icon-btn {
+    border: none;
+    background: rgba(255, 255, 255, 0.7);
+    color: var(--rainy-screen-text);
+    border-radius: 8px;
+    padding: 4px 6px;
+    font-size: 10px;
+    cursor: pointer;
+    box-shadow: var(--rainy-btn-shadow);
+}
+
+.rainy-mini-icon-btn:active {
+    box-shadow: inset 2px 2px 5px rgba(14, 165, 233, 0.1);
+    transform: translateY(1px);
+}
+
+.rainy-scr-card.is-starred {
+    border: 1px solid rgba(14, 165, 233, 0.25);
+    background: rgba(255, 255, 255, 0.6);
 }

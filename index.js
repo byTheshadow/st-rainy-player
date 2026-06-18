@@ -12,13 +12,47 @@
 
     const PLUGIN_NAME = 'rainy-player';
 
-    const CHANNELS = [
-        { id: 'theater',  icon: '🎬', label: '剧场' },
-        { id: 'radio',    icon: '📻', label: '电台' },
-        { id: 'summary',  icon: '📋', label: '摘要' },
-        { id: 'gallery',  icon: '🎨', label: '画廊' },
-        { id: 'settings', icon: '⚙️', label: '设置' },
-    ];
+   const CHANNELS = [
+    { id: 'theater',  icon: iconCircleUp,    label: '剧场' },
+    { id: 'radio',    icon: iconCircleLeft,  label: '电台' },
+    { id: 'summary',  icon: iconCircleCenter,label: '摘要' },
+    { id: 'gallery',  icon: iconCircleRight, label: '画廊' },
+    { id: 'settings', icon: iconCircleDown,  label: '设置' },
+];
+const iconCircleUp = `
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
+  <path d="M12 16V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8.8 11.2L12 8l3.2 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+const iconCircleDown = `
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
+  <path d="M12 8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8.8 12.8L12 16l3.2-3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+const iconCircleLeft = `
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
+  <path d="M16 12H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M11.2 8.8L8 12l3.2 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+const iconCircleRight = `
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
+  <path d="M8 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M12.8 8.8L16 12l-3.2 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+const iconCircleCenter = `
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/>
+  <circle cx="12" cy="12" r="3.2" fill="currentColor"/>
+</svg>`;
+
 
     const DEFAULT_SETTINGS = {
         sub_api: {
